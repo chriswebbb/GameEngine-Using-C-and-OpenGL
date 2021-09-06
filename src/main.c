@@ -1,13 +1,3 @@
-/*****************************************************************************
- * Wave Simulation in OpenGL
- * (C) 2002 Jakob Thomsen
- * http://home.in.tum.de/~thomsen
- * Modified for GLFW by Sylvain Hellegouarch - sh@programmationworld.com
- * Modified for variable frame rate by Marcus Geelnard
- * 2003-Jan-31: Minor cleanups and speedups / MG
- * 2010-10-24: Formatting and cleanup - Camilla Löwy
- *****************************************************************************/
-
  // Make MS math.h define M_PI
  #define _USE_MATH_DEFINES
 
@@ -43,8 +33,8 @@ struct Vertex
     GLfloat r, g, b;
 };
 
-#define GRIDW 100
-#define GRIDH 100
+#define GRIDW 120
+#define GRIDH 120
 #define VERTEXNUM (GRIDW*GRIDH)
 
 #define QUADW (GRIDW - 1)
