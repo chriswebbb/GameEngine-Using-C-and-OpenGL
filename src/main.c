@@ -369,7 +369,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     // Change to the projection matrix and set our viewing volume
     glMatrixMode(GL_PROJECTION);
     mat4x4_perspective(projection,
-                       120.f * (float) M_PI / 180.f,
+                       60.f * ((float) M_PI / 180.f),
                        ratio,
                        1.f, 1024.f);
     glLoadMatrixf((const GLfloat*) projection);
