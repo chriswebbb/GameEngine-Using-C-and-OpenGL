@@ -14,10 +14,10 @@
 #include <linmath.h>
 
 // Maximum delta T to allow for differential calculations
-#define MAX_DELTA_T 0.01
+#define MAX_DELTA_T 0.001
 
 // Animation speed (10.0 looks good)
-#define ANIMATION_SPEED 10.0
+#define ANIMATION_SPEED 1.0
 
 GLfloat alpha = 210.f, beta = -70.f;
 GLfloat zoom = 2.f;
@@ -154,6 +154,9 @@ void draw_scene(GLFWwindow* window)
     glRotatef(alpha, 0.0, 0.0, 1.0);
 
     glDrawElements(GL_QUADS, 4 * QUADNUM, GL_UNSIGNED_INT, quad);
+
+    //Provides a wire mesh opposed to a smooth texture
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     glfwSwapBuffers(window);
 }
@@ -371,7 +374,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     mat4x4_perspective(projection,
                        60.f * ((float) M_PI / 180.f),
                        ratio,
-                       1.f, 1024.f);
+                       0.1f, 1024.f);
     glLoadMatrixf((const GLfloat*) projection);
 }
 
@@ -391,7 +394,7 @@ int main(int argc, char* argv[])
     if (!glfwInit())
         exit(EXIT_FAILURE);
 
-    window = glfwCreateWindow(640, 480, "Wave Simulation", NULL, NULL);
+    window = glfwCreateWindow(1080, 720, "Wave Simulation", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
