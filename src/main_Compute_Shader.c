@@ -36,6 +36,16 @@ struct Vertex
     GLfloat r, g, b;
 };
 
+struct pos
+{
+    float x, y, z;
+};
+
+struct vel
+{
+    float vx, vy, vz;
+};
+
 #define GRIDW 250
 #define GRIDH 250
 #define VERTEXNUM (GRIDW*GRIDH)
@@ -44,8 +54,15 @@ struct Vertex
 #define QUADH (GRIDH - 1)
 #define QUADNUM (QUADW*QUADH)
 
+//Standard CPU way
 GLuint quad[4 * QUADNUM];
 struct Vertex vertex[VERTEXNUM];
+
+//Compute shader way, Shader Storage Buffer Object
+
+GLuint posSSbo;
+GLuint velSSbo;
+GLuint colSSbo;
 
 /* The grid will look like this:
  *
@@ -107,7 +124,7 @@ double vx[GRIDW][GRIDH], vy[GRIDW][GRIDH];
 double ax[GRIDW][GRIDH], ay[GRIDW][GRIDH];
 
 //========================================================================
-// Initialize grid
+// Initialize grid for CPU
 //========================================================================
 
 void init_grid(void)
@@ -136,6 +153,18 @@ void init_grid(void)
     }
 }
 
+//========================================================================
+// Initialize grid for Compute Shader
+//========================================================================
+
+void init_grid_compute_shader(void)
+{
+    glGenBuffers(1, &posSSbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, posSSbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, VERTEXNUM * sizeof(struct pos), NULL, GL_STATIC_DRAW);
+    
+
+}
 
 //========================================================================
 // Draw scene
