@@ -7,7 +7,7 @@
 #include <math.h>
 
 #define GLAD_GL_IMPLEMENTATION
-#include <glad/gl.h>
+#include <GLAD/glad.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -20,7 +20,7 @@
 #define ANIMATION_SPEED 10.0
 
 //Number of items to be worked on per work group
-#define WORK_GROUP_SIZE 128
+#define WORK_GROUP_SIZE 4
 
 GLfloat alpha = 210.f, beta = -70.f;
 GLfloat zoom = 2.f;
@@ -38,12 +38,12 @@ struct Vertex
 
 struct pos
 {
-    float x, y, z;
+    float x, y, z, p;
 };
 
-struct vel
+struct velAndAcc
 {
-    float vx, vy, vz;
+    float vx, vy, ax, ay;
 };
 
 #define GRIDW 250
@@ -59,10 +59,44 @@ GLuint quad[4 * QUADNUM];
 struct Vertex vertex[VERTEXNUM];
 
 //Compute shader way, Shader Storage Buffer Object
-
 GLuint posSSbo;
 GLuint velSSbo;
+GLuint preSSbo;
 GLuint colSSbo;
+
+// const char *csSrc[] = {
+//     "#version 420\n"
+//     "layout(local_size_x = 128) in;                 \
+//     layout(std140, binding = 0) buffer Pos&Pre;{    \
+//         vec4 Positions&Pressure[];                  \
+//     };                                              \
+//     layout(std140, binding = 1) buffer Vel&Acc {    \
+//         vec4 Velocity&Acceleration[];               \
+//     };                                              \
+//     void main(){                                    \
+//         uint index = gl_GlobalInvocationID.x;       \
+//         vec4 pos&pre = Positions&Pressure[index];   \
+//         vec4 vel&acc = Velocity&Acceleration[index];\
+//         vec3 position = pos&pre.xyz;                \
+//         float pressure = pos&pre.w;                 \
+//         vec2 velocity = vel&acc.xy;                 \
+//         vec2 acceleration = vel&acc.zw;             \
+//         position.z = (float)(pressure * (1/100));   \
+//         acceleration = pressure;                    \
+//         velocity = velocity + acceleration * 0.01;  \
+//         pressure =  pressure                        \
+//     }"
+// };
+
+const char *csSrc[] = {
+    "#version 430\n",
+    "uniform float roll;\
+        uniform image2D destTex;\
+        layout (local_size_x = 16, local_size_y = 16) in;\
+        void main() {\
+            uint index = gl_GlobalInvocationID.xy;\
+        }"
+};
 
 /* The grid will look like this:
  *
@@ -118,6 +152,27 @@ void init_vertices(void)
     }
 }
 
+void init_quad(void)
+{
+    int x, y, p;
+    
+    for (y = 0;  y < QUADH;  y++)
+    {
+        for (x = 0;  x < QUADW;  x++)
+        {
+            p = 4 * (y * QUADW + x);
+
+            quad[p + 0] = y       * GRIDW + x;     // Some point
+            quad[p + 1] = y       * GRIDW + x + 1; // Neighbor at the right side
+            quad[p + 2] = (y + 1) * GRIDW + x + 1; // Upper right neighbor
+            quad[p + 3] = (y + 1) * GRIDW + x;     // Upper neighbor
+        }
+    }
+
+    printf("\nInitialised quads");
+
+}
+
 double dt;
 double p[GRIDW][GRIDH];
 double vx[GRIDW][GRIDH], vy[GRIDW][GRIDH];
@@ -157,13 +212,150 @@ void init_grid(void)
 // Initialize grid for Compute Shader
 //========================================================================
 
-void init_grid_compute_shader(void)
-{
+GLuint init_compute_shader()
+{   
+    // Use Gouraud (smooth) shading
+    glShadeModel(GL_SMOOTH);
+
+    // Switch on the z-buffer
+    glEnable(GL_DEPTH_TEST);
+
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+
+    glPointSize(20.0);
+
+    // Background color is black
+    glClearColor(0, 0, 0, 0);
+
+    GLint p = 0;
+
+    GLuint program = glCreateProgram();
+    GLuint shader = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource( shader, 2, csSrc, NULL );
+    glCompileShader(shader);
+
+    glAttachShader(program, shader);
+    glLinkProgram(program);
+
+    //Points initialise
     glGenBuffers(1, &posSSbo);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, posSSbo);
     glBufferData(GL_SHADER_STORAGE_BUFFER, VERTEXNUM * sizeof(struct pos), NULL, GL_STATIC_DRAW);
-    
 
+    GLint bufMask = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT;
+
+    struct pos *points = (struct pos *) glMapBufferRange( GL_SHADER_STORAGE_BUFFER, 0, VERTEXNUM * sizeof(struct pos), bufMask );
+
+    glVertexPointer(3, GL_FLOAT, sizeof(struct Vertex), points);
+
+    int x, y;
+    double dx, dy, d;
+
+    printf("\n\nyeet\n\n");
+
+    for(int j = 0; j < GRIDH; j++)
+    {
+        for(int i = 0; i < GRIDW; i++){
+
+            p = j * GRIDW + i;
+
+            points[p].x = (GLfloat) (i - GRIDW / 2) / (GLfloat) (GRIDW / 2);
+            points[p].y = (GLfloat) (j - GRIDH / 2) / (GLfloat) (GRIDH / 2);
+            points[p].z = 0.0f;
+
+            dx = (double) (x - GRIDW / 2);
+            dy = (double) (y - GRIDH / 2);
+            d = sqrt(dx * dx + dy * dy);
+            if (d < 0.1 * (double) (GRIDW / 2))
+            {
+                d = d * 10.0;
+                points[p].p = -cos(d * (M_PI / (double)(GRIDW * 4))) * mapAmplitude;
+            }
+            else{
+                points[p].p = 0.0;
+            }
+        }
+    }
+
+    glUnmapBuffer( GL_SHADER_STORAGE_BUFFER );
+
+    printf("\nInitialised the vertices and pressure buffer");
+
+    //Velocity and acceleration initialise
+    glGenBuffers(1, &velSSbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, velSSbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, VERTEXNUM * sizeof(struct velAndAcc), NULL, GL_STATIC_DRAW);
+
+    struct velAndAcc *velsNAcc = (struct velAndAcc *) glMapBufferRange( GL_SHADER_STORAGE_BUFFER, 0, VERTEXNUM * sizeof(struct velAndAcc), bufMask );
+
+    for (int j = 0;  j < GRIDH;  j++)
+    {
+        for (int i = 0;  i < GRIDW;  i++)
+        {
+            p = (j * GRIDW + i);
+
+            velsNAcc[p].vx = 0.0f;
+            velsNAcc[p].vy = 0.0f;
+            velsNAcc[p].ax = 0.0f;
+            velsNAcc[p].ay = 0.0f;
+        }
+    }
+
+    glUnmapBuffer( GL_SHADER_STORAGE_BUFFER );
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,0,posSSbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,1,velSSbo);
+
+    printf("\nInitialise the velocities and acceleration buffer");
+
+    glUseProgram(program);
+    glDispatchCompute(GRIDW/WORK_GROUP_SIZE,GRIDH/WORK_GROUP_SIZE,1);
+
+    printf("\nInitialised compute shader");
+
+    return program;
+}
+
+//========================================================================
+// Draw scene with Compute Shader
+//========================================================================
+
+void draw_scene_with_compute_shaders(GLFWwindow* window, GLuint computeHandle)
+{
+    glUseProgram(computeHandle);
+	glDispatchCompute(GRIDW/WORK_GROUP_SIZE,GRIDH/WORK_GROUP_SIZE,1); // 512^2 threads in blocks of 16^2
+	//checkErrors("Dispatch compute shader");
+
+    glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+
+    // Clear the color and depth buffers
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // We don't want to modify the projection matrix
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    // Move back
+    glTranslatef(0.0, 0.0, -zoom);
+    // Rotate the view
+    glRotatef(beta, 1.0, 0.0, 0.0);
+    glRotatef(alpha, 0.0, 0.0, 1.0);
+   
+    glBindBuffer(GL_ARRAY_BUFFER, posSSbo);
+    glVertexPointer(3, GL_FLOAT, 0, (void *)0);
+    glEnableClientState(GL_VERTEX_ARRAY);
+
+     printf("\nbefore");
+    glDrawElements(GL_QUADS, 4 * QUADNUM, GL_UNSIGNED_INT, quad);
+    printf("\nAfter\n");
+    //Provides a wire mesh opposed to a smooth texture
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glfwSwapBuffers(window);
 }
 
 //========================================================================
@@ -193,7 +385,6 @@ void draw_scene(GLFWwindow* window)
     glfwSwapBuffers(window);
 }
 
-
 //========================================================================
 // Initialize Miscellaneous OpenGL state
 //========================================================================
@@ -217,7 +408,6 @@ void init_opengl(void)
     glClearColor(0, 0, 0, 0);
 }
 
-
 //========================================================================
 // Modify the height of each vertex according to the pressure
 //========================================================================
@@ -236,7 +426,6 @@ void adjust_grid(void)
         }
     }
 }
-
 
 //========================================================================
 // Calculate wave propagation
@@ -294,7 +483,6 @@ static void error_callback(int error, const char* description)
     fprintf(stderr, "Error: %s\n", description);
 }
 
-
 //========================================================================
 // Handle key strokes
 //========================================================================
@@ -337,7 +525,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
 }
 
-
 //========================================================================
 // Callback function for mouse button events
 //========================================================================
@@ -356,7 +543,6 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 }
 
-
 //========================================================================
 // Callback function for cursor motion events
 //========================================================================
@@ -373,7 +559,6 @@ void cursor_position_callback(GLFWwindow* window, double x, double y)
     }
 }
 
-
 //========================================================================
 // Callback function for scroll events
 //========================================================================
@@ -384,7 +569,6 @@ void scroll_callback(GLFWwindow* window, double x, double y)
     if (zoom < 0)
         zoom = 0;
 }
-
 
 //========================================================================
 // Callback function for framebuffer resize events
@@ -409,7 +593,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
                        0.1f, 1024.f);
     glLoadMatrixf((const GLfloat*) projection);
 }
-
 
 //========================================================================
 // main
@@ -440,19 +623,21 @@ int main(int argc, char* argv[])
     glfwSetScrollCallback(window, scroll_callback);
 
     glfwMakeContextCurrent(window);
-    gladLoadGL(glfwGetProcAddress);
+    gladLoadGL();
     glfwSwapInterval(1);
 
     glfwGetFramebufferSize(window, &width, &height);
     framebuffer_size_callback(window, width, height);
 
     // Initialize OpenGL
-    init_opengl();
+    //init_opengl();
+    GLuint computeHandler = init_compute_shader();
 
     // Initialize simulation
-    init_vertices();
-    init_grid();
-    adjust_grid();
+    init_quad();
+    //init_vertices();
+    //init_grid();
+    //adjust_grid();
 
     // Initialize timer
     t_old = glfwGetTime() - 0.01;
@@ -471,14 +656,18 @@ int main(int argc, char* argv[])
             dt_total -= dt;
 
             // Calculate wave propagation
-            calc_grid();
+            //calc_grid();
         }
 
+        draw_scene_with_compute_shaders(window, computeHandler);
+
         // Compute height of each vertex
-        adjust_grid();
+        //adjust_grid();
 
         // Draw wave grid to OpenGL display
-        draw_scene(window);
+        //draw_scene(window);
+
+        printf("checking while loop");
 
         glfwPollEvents();
     }

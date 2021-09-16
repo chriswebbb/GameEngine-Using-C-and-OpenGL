@@ -4,11 +4,11 @@ SHELL = /bin/sh
 
 CC = gcc
 CFLAGS = -std=c11 -g -Wall
-CFLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Ilib/noise -Ilib/glfw/deps
+CFLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Ilib/noise -Ilib/glfw/deps -Isrc
 
 #glfw contains glad2 so therefore to use it remove glad.o as that is the glad library, causes linker errors
-LDFLAGS +=  lib/cglm/build/libcglm.a lib/glfw/build/src/libglfw3.a lib/noise/libnoise.a -lm
-#LDFLAGS +=  lib/glad/src/glad.o lib/cglm/build/libcglm.a lib/glfw/build/src/libglfw3.a lib/noise/libnoise.a -lm
+#LDFLAGS +=  lib/cglm/build/libcglm.a lib/glfw/build/src/libglfw3.a lib/noise/libnoise.a -lm
+LDFLAGS +=  lib/glad/src/glad.o lib/cglm/build/libcglm.a lib/glfw/build/src/libglfw3.a lib/noise/libnoise.a -lm
 
 LDFLAGS +=  -lgdi32 -lopengl32
 HOME = C:/Users/mater/OneDrive/Documents/3DGameInCUsingOpenGL

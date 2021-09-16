@@ -11,7 +11,8 @@
   "C_Cpp_Runner.compilerArgs": [],
   "C_Cpp_Runner.includePaths": [
     "${workspaceFolder}/lib/glfw/deps",
-    "${workspaceFolder}/lib/glad/include"
+    "${workspaceFolder}/lib/glad/include",
+    "${workspaceFolder}/lib/cglm/include/CGLM"
   ],
   "C_Cpp_Runner.linkerArgs": [],
   "C_Cpp_Runner.cStandard": "",

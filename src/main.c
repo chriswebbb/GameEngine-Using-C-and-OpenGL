@@ -1,460 +1,441 @@
- // Make MS math.h define M_PI
- #define _USE_MATH_DEFINES
+#include "main.h"
 
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-
-#define GLAD_GL_IMPLEMENTATION
-#include <glad/gl.h>
-#define GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h>
-
-#include <linmath.h>
-
-// Maximum delta T to allow for differential calculations
-#define MAX_DELTA_T 0.01
-
-// Animation speed (10.0 looks good)
-#define ANIMATION_SPEED 10.0
-
-//Number of items to be worked on per work group
-#define WORK_GROUP_SIZE 128
-
-GLfloat alpha = 210.f, beta = -70.f;
-GLfloat zoom = 2.f;
-
-double cursorX;
-double cursorY;
-
-float mapAmplitude = 50.0f;
-
-struct Vertex
+typedef struct Vertex
 {
-    GLfloat x, y, z;
-    GLfloat r, g, b;
+    vec3 pos;
+    vec3 col;
+} Vertex;
+
+static const Vertex vertices[] =
+{
+    { {  0.0f,  0.0f, 0.0f }, { 1.f, 0.f, 0.f } },
+    { {  1.0f,  1.0f, 0.0f }, { 0.f, 1.f, 0.f } },
+    { {  1.0f,  0.0f, 0.0f }, { 0.f, 0.f, 1.f } },
+    { {  0.0f,  1.0f, 0.0f }, { 0.f, 0.f, 1.f } },
+
+    { {  0.0f,  1.0f, 1.0f }, { 1.f, 0.f, 0.f } },
+    { {  1.0f,  1.0f, 1.0f }, { 0.f, 1.f, 0.f } },
+    { {  0.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } },
+    { {  1.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } }   
+    
 };
 
-#define GRIDW 250
-#define GRIDH 250
-#define VERTEXNUM (GRIDW*GRIDH)
-
-#define QUADW (GRIDW - 1)
-#define QUADH (GRIDH - 1)
-#define QUADNUM (QUADW*QUADH)
-
-GLuint quad[4 * QUADNUM];
-struct Vertex vertex[VERTEXNUM];
-
-/* The grid will look like this:
- *
- *      3   4   5
- *      *---*---*
- *      |   |   |
- *      | 0 | 1 |
- *      |   |   |
- *      *---*---*
- *      0   1   2
- */
-
-//========================================================================
-// Initialize grid geometry
-//========================================================================
-
-void init_vertices(void)
+static const Vertex vertices_two[] =
 {
-    int x, y, p;
+    { {  2.0f,  0.0f, 0.0f }, { 1.f, 0.f, 0.f } },
+    { {  3.0f,  1.0f, 0.0f }, { 0.f, 1.f, 0.f } },
+    { {  3.0f,  0.0f, 0.0f }, { 0.f, 0.f, 1.f } },
+    { {  2.0f,  1.0f, 0.0f }, { 0.f, 0.f, 1.f } },
 
-    // Place the vertices in a grid
-    for (y = 0;  y < GRIDH;  y++)
-    {
-        for (x = 0;  x < GRIDW;  x++)
-        {
-            p = y * GRIDW + x;
+    { {  2.0f,  1.0f, 1.0f }, { 1.f, 0.f, 0.f } },
+    { {  3.0f,  1.0f, 1.0f }, { 0.f, 1.f, 0.f } },
+    { {  2.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } },
+    { {  3.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } }   
+    
+};
 
-            vertex[p].x = (GLfloat) (x - GRIDW / 2) / (GLfloat) (GRIDW / 2);
-            vertex[p].y = (GLfloat) (y - GRIDH / 2) / (GLfloat) (GRIDH / 2);
-            vertex[p].z = 0;
+unsigned int indices[] = {  0, 1, 2,
+                            0, 3, 1,
 
-            if ((x % 4 < 2) ^ (y % 4 < 2))
-                vertex[p].r = 0.0;
-            else
-                vertex[p].r = 1.0;
+                            3, 4, 5,
+                            5, 1, 3,
 
-            vertex[p].g = (GLfloat) y / (GLfloat) GRIDH;
-            vertex[p].b = 1.f - ((GLfloat) x / (GLfloat) GRIDW + (GLfloat) y / (GLfloat) GRIDH) / 2.f;
-        }
-    }
+                            2, 1, 5, 
+                            2, 5, 7,
 
-    for (y = 0;  y < QUADH;  y++)
-    {
-        for (x = 0;  x < QUADW;  x++)
-        {
-            p = 4 * (y * QUADW + x);
+                            0, 3, 4,
+                            0, 4, 6,
 
-            quad[p + 0] = y       * GRIDW + x;     // Some point
-            quad[p + 1] = y       * GRIDW + x + 1; // Neighbor at the right side
-            quad[p + 2] = (y + 1) * GRIDW + x + 1; // Upper right neighbor
-            quad[p + 3] = (y + 1) * GRIDW + x;     // Upper neighbor
-        }
-    }
+                            6, 4, 5,
+                            6, 5, 7,
+
+                            0, 6, 7,
+                            0, 7, 2
+};
+
+const char* load_shader( char* pathToFile )
+{
+    //Gotta use file length to get the size of the text file
+    //Then malloc to dynamically assign a buffer size. ( Allocate at runtime )
+    FILE *fp;
+    char buff[255];
+    char shader[10000];
+
+    fp = fopen(pathToFile, "r");
+
+    fread( shader, 1, 10000, fp );
+    printf("\n\n\nPrint Shader\n");
+    printf("___________\n");
+    printf("\n%s", shader);
+    printf("\n\n\n PRINTED SHADER \n\n\n");
+    fclose(fp);
+
+    return shader;
 }
 
-double dt;
-double p[GRIDW][GRIDH];
-double vx[GRIDW][GRIDH], vy[GRIDW][GRIDH];
-double ax[GRIDW][GRIDH], ay[GRIDW][GRIDH];
-
-//========================================================================
-// Initialize grid
-//========================================================================
-
-void init_grid(void)
+void shader_error(GLuint shader)
 {
-    int x, y;
-    double dx, dy, d;
-
-    for (y = 0; y < GRIDH;  y++)
+    int success = 0;
+    char infoLog[512];
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if(!success)
     {
-        for (x = 0; x < GRIDW;  x++)
-        {
-            dx = (double) (x - GRIDW / 2);
-            dy = (double) (y - GRIDH / 2);
-            d = sqrt(dx * dx + dy * dy);
-            if (d < 0.1 * (double) (GRIDW / 2))
-            {
-                d = d * 10.0;
-                p[x][y] = -cos(d * (M_PI / (double)(GRIDW * 4))) * mapAmplitude;
-            }
-            else
-                p[x][y] = 0.0;
-
-            vx[x][y] = 0.0;
-            vy[x][y] = 0.0;
-        }
-    }
+        glGetShaderInfoLog(shader, 512, NULL, infoLog);
+        printf("$s", infoLog);
+    }else printf("\nShader compiled successfully");
 }
-
-
-//========================================================================
-// Draw scene
-//========================================================================
-
-void draw_scene(GLFWwindow* window)
-{
-    // Clear the color and depth buffers
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // We don't want to modify the projection matrix
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    // Move back
-    glTranslatef(0.0, 0.0, -zoom);
-    // Rotate the view
-    glRotatef(beta, 1.0, 0.0, 0.0);
-    glRotatef(alpha, 0.0, 0.0, 1.0);
-
-    glDrawElements(GL_QUADS, 4 * QUADNUM, GL_UNSIGNED_INT, quad);
-
-    //Provides a wire mesh opposed to a smooth texture
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    glfwSwapBuffers(window);
-}
-
-
-//========================================================================
-// Initialize Miscellaneous OpenGL state
-//========================================================================
-
-void init_opengl(void)
-{
-    // Use Gouraud (smooth) shading
-    glShadeModel(GL_SMOOTH);
-
-    // Switch on the z-buffer
-    glEnable(GL_DEPTH_TEST);
-
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_COLOR_ARRAY);
-    glVertexPointer(3, GL_FLOAT, sizeof(struct Vertex), vertex);
-    glColorPointer(3, GL_FLOAT, sizeof(struct Vertex), &vertex[0].r); // Pointer to the first color
-
-    glPointSize(2.0);
-
-    // Background color is black
-    glClearColor(0, 0, 0, 0);
-}
-
-
-//========================================================================
-// Modify the height of each vertex according to the pressure
-//========================================================================
-
-void adjust_grid(void)
-{
-    int pos;
-    int x, y;
-
-    for (y = 0; y < GRIDH;  y++)
-    {
-        for (x = 0;  x < GRIDW;  x++)
-        {
-            pos = y * GRIDW + x;
-            vertex[pos].z = (float) (p[x][y] * (1.0 / 50.0));
-        }
-    }
-}
-
-
-//========================================================================
-// Calculate wave propagation
-//========================================================================
-
-void calc_grid(void)
-{
-    int x, y, x2, y2;
-    double time_step = dt * ANIMATION_SPEED;
-
-    // Compute accelerations
-    for (x = 0;  x < GRIDW;  x++)
-    {
-        x2 = (x + 1) % GRIDW;
-        for(y = 0; y < GRIDH; y++)
-            ax[x][y] = p[x][y] - p[x2][y];
-    }
-
-    for (y = 0;  y < GRIDH;  y++)
-    {
-        y2 = (y + 1) % GRIDH;
-        for(x = 0; x < GRIDW; x++)
-            ay[x][y] = p[x][y] - p[x][y2];
-    }
-
-    // Compute speeds
-    for (x = 0;  x < GRIDW;  x++)
-    {
-        for (y = 0;  y < GRIDH;  y++)
-        {
-            vx[x][y] = vx[x][y] + ax[x][y] * time_step;
-            vy[x][y] = vy[x][y] + ay[x][y] * time_step;
-        }
-    }
-
-    // Compute pressure
-    for (x = 1;  x < GRIDW;  x++)
-    {
-        x2 = x - 1;
-        for (y = 1;  y < GRIDH;  y++)
-        {
-            y2 = y - 1;
-            p[x][y] = p[x][y] + (vx[x2][y] - vx[x][y] + vy[x][y2] - vy[x][y]) * time_step;
-        }
-    }
-}
-
-
-//========================================================================
-// Print errors
-//========================================================================
 
 static void error_callback(int error, const char* description)
 {
-    fprintf(stderr, "Error: %s\n", description);
+    fprintf(stderr, "\nError: %s", description);
 }
 
-
-//========================================================================
-// Handle key strokes
-//========================================================================
-
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (action != GLFW_PRESS)
-        return;
-
-    switch (key)
-    {
-        case GLFW_KEY_ESCAPE:
-            glfwSetWindowShouldClose(window, GLFW_TRUE);
-            break;
-        case GLFW_KEY_SPACE:
-            init_grid();
-            break;
-        case GLFW_KEY_LEFT:
-            alpha += 5;
-            break;
-        case GLFW_KEY_RIGHT:
-            alpha -= 5;
-            break;
-        case GLFW_KEY_UP:
-            beta -= 5;
-            break;
-        case GLFW_KEY_DOWN:
-            beta += 5;
-            break;
-        case GLFW_KEY_PAGE_UP:
-            zoom -= 0.25f;
-            if (zoom < 0.f)
-                zoom = 0.f;
-            break;
-        case GLFW_KEY_PAGE_DOWN:
-            zoom += 0.25f;
-            break;
-        default:
-            break;
-    }
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
-
-//========================================================================
-// Callback function for mouse button events
-//========================================================================
-
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+GLFWwindow* create_window(int width, int height, char* name)
 {
-    if (button != GLFW_MOUSE_BUTTON_LEFT)
-        return;
+    if (!glfwInit())                                                        //initialise GLFW
+    exit(EXIT_FAILURE);
 
-    if (action == GLFW_PRESS)
-    {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        glfwGetCursorPos(window, &cursorX, &cursorY);
-    }
-    else
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-}
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);                          //Tell GLFW which version of 4.6 works
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);          //Tell GLFW we are using the core profile
 
-
-//========================================================================
-// Callback function for cursor motion events
-//========================================================================
-
-void cursor_position_callback(GLFWwindow* window, double x, double y)
-{
-    if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED)
-    {
-        alpha += (GLfloat) (x - cursorX) / 10.f;
-        beta += (GLfloat) (y - cursorY) / 10.f;
-
-        cursorX = x;
-        cursorY = y;
-    }
-}
-
-
-//========================================================================
-// Callback function for scroll events
-//========================================================================
-
-void scroll_callback(GLFWwindow* window, double x, double y)
-{
-    zoom += (float) y / 4.f;
-    if (zoom < 0)
-        zoom = 0;
-}
-
-
-//========================================================================
-// Callback function for framebuffer resize events
-//========================================================================
-
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-    float ratio = 1.f;
-    mat4x4 projection;
-
-    if (height > 0)
-        ratio = (float) width / (float) height;
-
-    // Setup viewport
-    glViewport(0, 0, width, height);
-
-    // Change to the projection matrix and set our viewing volume
-    glMatrixMode(GL_PROJECTION);
-    mat4x4_perspective(projection,
-                       60.f * ((float) M_PI / 180.f),
-                       ratio,
-                       0.1f, 1024.f);
-    glLoadMatrixf((const GLfloat*) projection);
-}
-
-
-//========================================================================
-// main
-//========================================================================
-
-int main(int argc, char* argv[])
-{
-    GLFWwindow* window;
-    double t, dt_total, t_old;
-    int width, height;
-
-    glfwSetErrorCallback(error_callback);
-
-    if (!glfwInit())
-        exit(EXIT_FAILURE);
-
-    window = glfwCreateWindow(1080, 720, "Wave Simulation", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(width, height, name, NULL, NULL); //Create window object
     if (!window)
     {
+        printf("\nError: Failed to generate glfw window");
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
 
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetCursorPosCallback(window, cursor_position_callback);
-    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetKeyCallback(window, key_callback);                                   //Key callback function
 
-    glfwMakeContextCurrent(window);
-    gladLoadGL(glfwGetProcAddress);
-    glfwSwapInterval(1);
+    glfwMakeContextCurrent(window);                                             //Makes the window object the current context of the calling thread 
+    gladLoadGL();
+    //gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    glfwSwapInterval(0.0);                                                      //Time to wait between buffer updates
+    
+    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 
-    glfwGetFramebufferSize(window, &width, &height);
-    framebuffer_size_callback(window, width, height);
+    return window;
+}
 
-    // Initialize OpenGL
-    init_opengl();
+void processInput(GLFWwindow *window, vec3 *cameraPos, vec3 *cameraForward, vec3 *cameraUp, int deltaTime)
+{
+    vec3 result;
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
 
-    // Initialize simulation
-    init_vertices();
-    init_grid();
-    adjust_grid();
-
-    // Initialize timer
-    t_old = glfwGetTime() - 0.01;
-
-    while (!glfwWindowShouldClose(window))
+    const float cameraSpeed = 2.5f * deltaTime; // adjust accordingly
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
-        t = glfwGetTime();
-        dt_total = t - t_old;
-        t_old = t;
+        glm_vec3_scale(cameraForward, cameraSpeed, result);
+        glm_vec3_add(cameraPos, result, cameraPos);
+        printf("\nRegistered W being pressed");
+    }
+    else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    {
+        glm_vec3_scale(cameraForward, cameraSpeed, result);
+        glm_vec3_sub(cameraPos, result, cameraPos);
+    }
+    else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    {
+        glm_cross(cameraForward, cameraUp, result);
+        glm_normalize(result);
+        glm_vec3_scale(result, cameraSpeed, result);
+        glm_vec3_sub(cameraPos, result, cameraPos);
+    }
+    else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    {
+        glm_cross(cameraForward, cameraUp, result);
+        glm_normalize(result);
+        glm_vec3_scale(result, cameraSpeed, result);
+        glm_vec3_add(cameraPos, result, cameraPos);
+    }
+}
 
-        // Safety - iterate if dt_total is too large
-        while (dt_total > 0.f)
+int main(void)
+{
+    GLFWwindow* window = create_window(640, 480, "OpenGL Triangle");
+
+    glfwSetErrorCallback(error_callback);
+
+    int multiple_cubs = 0;
+
+    mat4 view = GLM_MAT4_IDENTITY_INIT;
+    vec3 eye = {0.0f, 0.0f, 3.0f};
+    vec3 forward = {0.0f, 0.0f, -1.0f};
+    vec3 up = {0.0f, 1.0f, 0.0f};
+
+    glm_look(eye, forward, up, view);
+
+    ////////////////////////////////////////////////////////////////////////////////////////
+    //Creating and initializing Shaders, then adding them to a program. 
+    //Then linking them within the program
+    ////////////////////////////////////////////////////////////////////////////////////////
+
+    const GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);              //Generate an ID for the shader, specifying that it is a vertex shader and then assign it to the ID holder.
+    glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);                //Attach the shader created using the ID. First argument is ID, second is the number of strings, third is the source code and the fourth is array of string lengths.
+    glCompileShader(vertex_shader);                                             //Compile the shader.
+    shader_error(vertex_shader);
+
+    const GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);          //The same as vertex shader but for fragment shader instead.
+    glShaderSource(fragment_shader, 1, &fragment_shader_text_three, NULL);
+    glCompileShader(fragment_shader);
+    shader_error(fragment_shader);
+
+    const GLuint program = glCreateProgram();                                   //Generates a program ID and provides it to the program variables
+    glAttachShader(program, vertex_shader);                                     //Attach the vertex shader object to the program object
+    glAttachShader(program, fragment_shader);                                   //Attach the fragment_shader object to the program object
+    glLinkProgram(program);                                                     //Links the program object specified
+
+    //Second Shader construction.
+
+    const GLuint fragment_shader_two = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader_two, 1, &fragment_shader_text, NULL);
+    glCompileShader(fragment_shader_two);
+    shader_error(fragment_shader_two);
+
+    const GLuint program_two = glCreateProgram();
+    glAttachShader(program_two, vertex_shader);
+    glAttachShader(program_two, fragment_shader_two);
+    glLinkProgram(program_two);
+
+    //Now the shaders have been put into the program object and linked we can delete the original shader objects.
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+
+    glDeleteShader(fragment_shader_two);
+
+    ////////////////////////////////////////////////////////////////////////////////////////
+    //Creating and initializing VBO ( Vertex Buffer Object )
+    ////////////////////////////////////////////////////////////////////////////////////////
+
+    GLuint vertex_buffer;                                                       //Holds the ID of the buffer containing the vertex data.
+    glGenBuffers(1, &vertex_buffer);                                            //Generates a buffer object name
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);                               //Takes the buffer object name and binds it to a buffer of the type specified.
+    
+    //Creates and initialises a buffer objects data store within the GPU. The first argument is the type of data, second is the size of data in bytes, third is the data and 
+    //the fourth specifies how to manage said data.
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);                                  
+
+    ////////////////////////////////////////////////////////////////////////////////////////
+    //How to interpret the data passed to the GPU via VAO ( Vertex Array Object )
+    ////////////////////////////////////////////////////////////////////////////////////////
+
+    const GLint mvp_location = glGetUniformLocation(program, "MVP");        //Returns the location of a uniform variable
+    const GLint vpos_location = glGetAttribLocation(program, "vPos");
+    const GLint vcol_location = glGetAttribLocation(program, "vCol");
+    const GLint u_time_location = glGetUniformLocation(program, "u_time");
+
+    GLuint vertex_array;                                                    //Generates an Id for the vertexArray object
+    glGenVertexArrays(1, &vertex_array);                                    //Generate a vertex array object
+    glBindVertexArray(vertex_array);                                        //Binds the vertex array object to the name specified
+    glEnableVertexAttribArray(vpos_location);                               //Enable the generic vertex attrivute arrays
+    //The first argument specifies the vertex attribute we wish to configure ( either via location = 0 or in attribute).
+    //The second argument specified the size of the attribute either 2, 3, 4 as these are the vector sizes
+    //The third argument specifies the data type
+    //The fourth argument specifies whether or not the data needs to be normalised ( 0.0 - 1.0 )
+    //The fifth argument is known as the stride and tells us the space between consecutive vertex attributes.
+    //The sixth and final argument specifies a offset of the first component of the first generic vertex attribute in the array in the data store of the buffer currently bount to the GL_ARRAY_BUFFER targer.
+    glVertexAttribPointer(vpos_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, pos));
+    glEnableVertexAttribArray(vcol_location);
+    glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, col));
+  
+    ////////////////////////////////////////////////////////////////////////////////////////
+    //Using EBO ( Element Buffer Object ) to draw with indices
+    //////////////////////////////////////////////////////////////////////////////////////// 
+
+    unsigned int EBO;
+    glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////
+    //Creating a second cube that uses a seperate vertex array object
+    ////////////////////////////////////////////////////////////////////////////////////////
+
+    const GLint mvp_location_two = glGetUniformLocation(program_two, "MVP");        //Returns the location of a uniform variable
+    const GLint vpos_location_two = glGetAttribLocation(program_two, "vPos");
+    const GLint vcol_location_two = glGetAttribLocation(program_two, "vCol");
+    const GLint u_time_location_two = glGetUniformLocation(program_two, "u_time");
+
+    //1. Generate and bind vertex buffer object and copy the vertex data into the buffer
+    GLuint vertex_buffer_two;
+    glGenBuffers(1, &vertex_buffer_two);                                            
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_two);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices_two, GL_DYNAMIC_DRAW);
+    //2. Generate and bind vertex array
+    GLuint vertex_array_two;                                                    
+    glGenVertexArrays(1, &vertex_array_two);                                    
+    glBindVertexArray(vertex_array_two);                                        
+    glEnableVertexAttribArray(vpos_location_two);
+    glVertexAttribPointer(vpos_location_two, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, pos));
+    glEnableVertexAttribArray(vcol_location_two);
+    glVertexAttribPointer(vcol_location_two, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, col));
+    //3. Generate and bind the element buffer object and then populate the buffer
+    unsigned int EBO_two;
+    glGenBuffers(1, &EBO_two);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_two);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+
+    ////////////////////////////////////////////////////////////////////////////////////////
+    //Z-Buffer
+    //////////////////////////////////////////////////////////////////////////////////////// 
+
+    glEnable(GL_DEPTH_TEST);
+
+    ////////////////////////////////////////////////////////////////////////////////////////
+    //Game loop
+    //////////////////////////////////////////////////////////////////////////////////////// 
+
+    int width, height;
+
+    vec3 result;
+
+    load_shader("shader_two.fs");
+
+    float u_time = glfwGetTime();
+    float currentFrame;
+    float lastFrame;
+    float deltaTime;
+   
+
+    while (!glfwWindowShouldClose(window))  //Checks if the window is meant to close
+    {   
+        
+        currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        u_time = glfwGetTime();
+
+        // processInput(window, &eye, &forward, &up, 0.1f);
+
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         {
-            // Select iteration time step
-            dt = dt_total > MAX_DELTA_T ? MAX_DELTA_T : dt_total;
-            dt_total -= dt;
-
-            // Calculate wave propagation
-            calc_grid();
+            glm_vec3_scale(forward, 1.5f * deltaTime, result);
+            glm_vec3_add(eye, result, eye);
         }
 
-        // Compute height of each vertex
-        adjust_grid();
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        {
+            glm_vec3_scale(forward, 1.5f * deltaTime, result);
+            glm_vec3_sub(eye, result, eye);
+        }
 
-        // Draw wave grid to OpenGL display
-        draw_scene(window);
+        if(glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        {
+            glm_vec3_rotate(forward, -(45*3.14159265358979323846*deltaTime)/180, (vec3){0.0f, 1.0f, 0.0f});
+            glm_vec3_normalize(forward);
+        }
 
-        glfwPollEvents();
+        if(glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        {
+            glm_vec3_rotate(forward, (45*3.14159265358979323846*deltaTime)/180, (vec3){0.0f, 1.0f, 0.0f});
+            glm_vec3_normalize(forward);
+        }
+
+        if(glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        {
+            glm_vec3_scale(up, 1.5f * deltaTime, result);
+            glm_vec3_add(eye, result, eye);
+        }
+
+        if(glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        {
+            glm_vec3_scale(up, 1.5f * deltaTime, result);
+            glm_vec3_sub(eye, result, eye);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        {
+            glm_cross(forward, up, result);
+            glm_normalize(result);
+            glm_vec3_scale(result, 1.5f * deltaTime, result);
+            glm_vec3_sub(eye, result, eye);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        {
+            glm_cross(forward, up, result);
+            glm_normalize(result);
+            glm_vec3_scale(result, 1.5f * deltaTime, result);
+            glm_vec3_add(eye, result, eye);
+        }
+
+        glm_look(eye, forward, up, view);
+        
+        //Retrieves the window dimensions and then alters the width and height variables so that the game engine gets the correct values.
+        glfwGetFramebufferSize(window, &width, &height);
+        //The ratio of screen width to heigh for projection matrix.
+        const float ratio = width / (float) height;
+        
+        //This tells OpenGL the size of the window so it can adjust the data accordingly to render to the screen.
+        //Essentially it converts the 2D projection space generated into the normalised screen space.
+        //The first two arguments are the bottom left coordinates, the third and four coordinates are for the top right.
+        glViewport(0, 0, width, height);
+        //This clears the colour buffer               
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        mat4x4 m, p, mvp;
+        mat4x4_identity(m);
+        mat4x4_translate(m, -0.5, -0.5, 0.0);
+        //mat4x4_rotate_X(m, m, glfwGetTime()*0.75);
+        mat4x4_rotate_Y(m, m, glfwGetTime()*0.25);
+        //mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 10.f, -10.f);
+        //mat4x4_perspective(p, (50*3.14159265358979323846)/180, ratio, 0.1f, 100.0f);
+        glm_perspective((60*3.14159265358979323846)/180, ratio, 0.5f, 100.f, p);
+        mat4x4_mul(mvp, view, m);
+        mat4x4_mul(mvp, p, mvp);
+
+        glUseProgram(program);
+        glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) &mvp);
+        glUniform1f(u_time_location, u_time);
+        glBindVertexArray(vertex_array);    //Binds the vertex array object declared above to t
+        //glDrawArrays(GL_TRIANGLES, 0, 6);   //Draws the triangles specified by the vertex array object
+        //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+        mat4x4_identity(m);
+        //mat4x4_translate(m, 0.0, 0.0, 10.0);
+        //mat4x4_rotate_X(m, m, glfwGetTime()*1.5);
+        glm_perspective((60*3.14159265358979323846)/180, ratio, 0.5f, 100.0f, p);
+        mat4x4_mul(mvp, view, m);
+        mat4x4_mul(mvp, p, mvp);
+
+        glUseProgram(program_two);
+        glUniformMatrix4fv(mvp_location_two, 1, GL_FALSE, (const GLfloat*) &mvp);
+        glUniform1f(u_time_location_two, u_time);
+        glBindVertexArray(vertex_array_two);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+        //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+        glfwSwapBuffers(window);    //Swaps the back and front buffers, ensures that the amount of time specified in the interval has been met first before the change. 
+        glfwPollEvents();           //Checks if any events have been triggered and then updates the windows state accordingly.
     }
+
+    glDeleteVertexArrays(1, vertex_array);
+    glDeleteBuffers(1, vertex_buffer);
+    glDeleteVertexArrays(1, vertex_array_two);
+    glDeleteBuffers(1, vertex_buffer_two);
+    glDeleteProgram(program);
+    glDeleteProgram(program_two); 
+
+    glfwDestroyWindow(window);
 
     glfwTerminate();
     exit(EXIT_SUCCESS);
 }
 
+
+
+
+//! [code]
