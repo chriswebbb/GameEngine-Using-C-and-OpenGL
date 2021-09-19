@@ -1,5 +1,14 @@
 #include "main.h"
 
+    int firstMouse = 1;
+    vec3 cameraFront;
+
+    float yaw   = -90.0f;	// yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right so we initially rotate a bit to the left.
+    float pitch =  0.0f;
+
+    float lastX =  1920.0f / 2.0;
+    float lastY =  1080.0 / 2.0;
+
 typedef struct Vertex
 {
     vec3 pos;
@@ -96,6 +105,39 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+    lastX = xpos;
+    lastY = ypos;
+
+    float sensitivity = 0.1f; // change this value to your liking
+    xoffset *= sensitivity;
+    yoffset *= sensitivity;
+
+    yaw += xoffset;
+    pitch += yoffset;
+
+    // make sure that when pitch is out of bounds, screen doesn't get flipped
+    if (pitch > 89.0f)
+        pitch = 89.0f;
+    if (pitch < -89.0f)
+        pitch = -89.0f;
+
+    cameraFront[0] = cos((3.14159265358979323846*yaw)/180) * cos((3.14159265358979323846*pitch)/180);
+    cameraFront[1] = sin((3.14159265358979323846*pitch)/180);
+    cameraFront[2] = sin((3.14159265358979323846*yaw)/180) * cos((3.14159265358979323846*pitch)/180);
+    glm_normalize(cameraFront);
+}
+
 GLFWwindow* create_window(int width, int height, char* name)
 {
     if (!glfwInit())                                                        //initialise GLFW
@@ -114,6 +156,8 @@ GLFWwindow* create_window(int width, int height, char* name)
     }
 
     glfwSetKeyCallback(window, key_callback);                                   //Key callback function
+    glfwSetErrorCallback(error_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
 
     glfwMakeContextCurrent(window);                                             //Makes the window object the current context of the calling thread 
     gladLoadGL();
@@ -161,9 +205,7 @@ void processInput(GLFWwindow *window, vec3 *cameraPos, vec3 *cameraForward, vec3
 
 int main(void)
 {
-    GLFWwindow* window = create_window(640, 480, "OpenGL Triangle");
-
-    glfwSetErrorCallback(error_callback);
+    GLFWwindow* window = create_window(1920, 1080, "OpenGL Triangle");
 
     int multiple_cubs = 0;
 
@@ -301,36 +343,35 @@ int main(void)
 
     load_shader("shader_two.fs");
 
-    float u_time = glfwGetTime();
-    float currentFrame;
-    float lastFrame;
-    float deltaTime;
-   
+    float u_time = glfwGetTime();   //Gets the time for the shader file
+    float currentFrame;             //Holds the value for current frame 
+    float lastFrame;                //Holds the previous frames start time
+    float deltaTime;                //Difference in time between frames
 
     while (!glfwWindowShouldClose(window))  //Checks if the window is meant to close
     {   
         
-        currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
+        currentFrame = glfwGetTime();           //Set the time equal to the current frame variable 
+        deltaTime = currentFrame - lastFrame;   //Delta time
         lastFrame = currentFrame;
 
         u_time = glfwGetTime();
 
         // processInput(window, &eye, &forward, &up, 0.1f);
 
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)   //Checks for W press, multiplies the forward vector generated 
         {
-            glm_vec3_scale(forward, 1.5f * deltaTime, result);
+            glm_vec3_scale(cameraFront, 1.5f * deltaTime, result);
             glm_vec3_add(eye, result, eye);
         }
 
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         {
-            glm_vec3_scale(forward, 1.5f * deltaTime, result);
+            glm_vec3_scale(cameraFront, 1.5f * deltaTime, result);
             glm_vec3_sub(eye, result, eye);
         }
 
-        if(glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        if(glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)    //Rotates the forward vector in the y-axis and then normalises it.
         {
             glm_vec3_rotate(forward, -(45*3.14159265358979323846*deltaTime)/180, (vec3){0.0f, 1.0f, 0.0f});
             glm_vec3_normalize(forward);
@@ -342,7 +383,7 @@ int main(void)
             glm_vec3_normalize(forward);
         }
 
-        if(glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        if(glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)       //Same as W but for vertical movement instead.
         {
             glm_vec3_scale(up, 1.5f * deltaTime, result);
             glm_vec3_add(eye, result, eye);
@@ -354,8 +395,8 @@ int main(void)
             glm_vec3_sub(eye, result, eye);
         }
 
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        {
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)       //Takes a forward vector and the up vector and cross product them to get the new right 
+        {                                                       //vector and then do the same as the rest.
             glm_cross(forward, up, result);
             glm_normalize(result);
             glm_vec3_scale(result, 1.5f * deltaTime, result);
@@ -370,8 +411,9 @@ int main(void)
             glm_vec3_add(eye, result, eye);
         }
 
-        glm_look(eye, forward, up, view);
-        
+        // glm_look(eye, forward, up, view);                       //Generate the updated view matrix
+        glm_look(eye, cameraFront, up, view);
+
         //Retrieves the window dimensions and then alters the width and height variables so that the game engine gets the correct values.
         glfwGetFramebufferSize(window, &width, &height);
         //The ratio of screen width to heigh for projection matrix.
@@ -392,8 +434,8 @@ int main(void)
         //mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 10.f, -10.f);
         //mat4x4_perspective(p, (50*3.14159265358979323846)/180, ratio, 0.1f, 100.0f);
         glm_perspective((60*3.14159265358979323846)/180, ratio, 0.5f, 100.f, p);
-        mat4x4_mul(mvp, view, m);
-        mat4x4_mul(mvp, p, mvp);
+        mat4x4_mul(mvp, view, m);   //Does M*V
+        mat4x4_mul(mvp, p, mvp);    //Then does (M*V)*P for the final transformation matrix
 
         glUseProgram(program);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) &mvp);
