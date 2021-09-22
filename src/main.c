@@ -1,22 +1,18 @@
 #include "main.h"
 
+#define WINDOWHEIGHT 1920.0f
+#define WINDOWWIDTH 1080.0f
+#define PI 3.14159265358979323846f
+
 int firstMouse = 1;
-vec3 cameraFront;
 
-float yaw   = -90.0f;	// yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right so we initially rotate a bit to the left.
-float pitch =  0.0f;
+gameEngineState engineState = {WINDOWHEIGHT, WINDOWWIDTH, 0, 0.0f};//engineState = {.toggleWireMesh = 1};
+cameraState camera = {-90.0f, 0.0f, GLM_MAT4_IDENTITY_INIT, {0.0f, 0.0f, 3.0f},{0.0f, 0.0f, -1.0f},{0.0f, 1.0f, 0.0f}, 120.0f};
 
-float lastX =  1920.0f / 2.0;
-float lastY =  1080.0 / 2.0;
+float lastX =  WINDOWHEIGHT / 2.0;
+float lastY =  WINDOWWIDTH / 2.0;
 
-typedef struct Vertex
-{
-    vec3 pos;
-    vec3 col;
-} Vertex;
-
-static const Vertex vertices[] =
-{
+static const Vertex vertices[] = {
     { {  0.0f,  0.0f, 0.0f }, { 1.f, 0.f, 0.f } },
     { {  1.0f,  1.0f, 0.0f }, { 0.f, 1.f, 0.f } },
     { {  1.0f,  0.0f, 0.0f }, { 0.f, 0.f, 1.f } },
@@ -26,11 +22,9 @@ static const Vertex vertices[] =
     { {  1.0f,  1.0f, 1.0f }, { 0.f, 1.f, 0.f } },
     { {  0.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } },
     { {  1.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } }   
-    
 };
 
-static const Vertex vertices_two[] =
-{
+static const Vertex vertices_two[] = {
     { {  2.0f,  0.0f, 0.0f }, { 1.f, 0.f, 0.f } },
     { {  3.0f,  1.0f, 0.0f }, { 0.f, 1.f, 0.f } },
     { {  3.0f,  0.0f, 0.0f }, { 0.f, 0.f, 1.f } },
@@ -40,26 +34,27 @@ static const Vertex vertices_two[] =
     { {  3.0f,  1.0f, 1.0f }, { 0.f, 1.f, 0.f } },
     { {  2.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } },
     { {  3.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } }   
-    
 };
 
-unsigned int indices[] = {  0, 1, 2,
+//Counter-ClockWise winding
+unsigned int indices[] = {  //front
+                            0, 1, 2,
                             0, 3, 1,
-
+                            //Top
                             3, 4, 5,
                             5, 1, 3,
-
+                            //Right
                             2, 1, 5, 
                             2, 5, 7,
-
-                            0, 3, 4,
-                            0, 4, 6,
-
-                            6, 4, 5,
-                            6, 5, 7,
-
-                            0, 6, 7,
-                            0, 7, 2
+                            //Left
+                            0, 6, 3,
+                            3, 6, 4,
+                            //Back
+                            4, 6, 7,
+                            4, 7, 5,
+                            //Bottom
+                            0, 2, 6,
+                            6, 2, 7
 };
 
 const char* load_shader( char* pathToFile )
@@ -103,6 +98,72 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+    if (glfwGetKey(window, GLFW_KEY_F3) == GLFW_PRESS)
+    {
+        if(engineState.toggleWireMesh){
+            engineState.toggleWireMesh = 0;
+        }else if(!engineState.toggleWireMesh ){
+            engineState.toggleWireMesh = 1;
+        }
+    }
+}
+
+void processMovementInput(GLFWwindow* window)
+{
+            // processInput(window, &eye, &forward, &up, 0.1f);
+    vec3 result;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)   //Checks for W press, multiplies the forward vector generated 
+    {
+        glm_vec3_scale(camera.forward, 1.5f * engineState.deltaTime, result);
+        glm_vec3_add(camera.eye, result, camera.eye);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    {
+        glm_vec3_scale(camera.forward, 1.5f * engineState.deltaTime, result);
+        glm_vec3_sub(camera.eye, result, camera.eye);
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)    //Rotates the forward vector in the y-axis and then normalises it.
+    {
+        glm_vec3_rotate(camera.forward, -(45*PI*engineState.deltaTime)/180, (vec3){0.0f, 1.0f, 0.0f});
+        glm_vec3_normalize(camera.forward);
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+    {
+        glm_vec3_rotate(camera.forward, (45*PI*engineState.deltaTime)/180, (vec3){0.0f, 1.0f, 0.0f});
+        glm_vec3_normalize(camera.forward);
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)       //Same as W but for vertical movement instead.
+    {
+        glm_vec3_scale(camera.up, 1.5f * engineState.deltaTime, result);
+        glm_vec3_add(camera.eye, result, camera.eye);
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+    {
+        glm_vec3_scale(camera.up, 1.5f * engineState.deltaTime, result);
+        glm_vec3_sub(camera.eye, result, camera.eye);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)       //Takes a forward vector and the up vector and cross product them to get the new right 
+    {                                                       //vector and then do the same as the rest.
+        glm_cross(camera.forward, camera.up, result);
+        glm_normalize(result);
+        glm_vec3_scale(result, 1.5f * engineState.deltaTime, result);
+        glm_vec3_sub(camera.eye, result, camera.eye);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    {
+        glm_cross(camera.forward, camera.up, result);
+        glm_normalize(result);
+        glm_vec3_scale(result, 1.5f * engineState.deltaTime, result);
+        glm_vec3_add(camera.eye, result, camera.eye);
+    }
 }
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
@@ -123,19 +184,19 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
-    yaw += xoffset;
-    pitch += yoffset;
+    camera.yaw += xoffset;
+    camera.pitch += yoffset;
 
     // make sure that when pitch is out of bounds, screen doesn't get flipped
-    if (pitch > 89.0f)
-        pitch = 89.0f;
-    if (pitch < -89.0f)
-        pitch = -89.0f;
+    if (camera.pitch > 89.0f)
+        camera.pitch = 89.0f;
+    if (camera.pitch < -89.0f)
+        camera.pitch = -89.0f;
 
-    cameraFront[0] = cos((3.14159265358979323846*yaw)/180) * cos((3.14159265358979323846*pitch)/180);
-    cameraFront[1] = sin((3.14159265358979323846*pitch)/180);
-    cameraFront[2] = sin((3.14159265358979323846*yaw)/180) * cos((3.14159265358979323846*pitch)/180);
-    glm_normalize(cameraFront);
+    camera.forward[0] = cos((3.14159265358979323846*camera.yaw)/180) * cos((3.14159265358979323846*camera.pitch)/180);
+    camera.forward[1] = sin((3.14159265358979323846*camera.pitch)/180);
+    camera.forward[2] = sin((3.14159265358979323846*camera.yaw)/180) * cos((3.14159265358979323846*camera.pitch)/180);
+    glm_normalize(camera.forward);
 }
 
 GLFWwindow* create_window(int width, int height, char* name)
@@ -158,6 +219,7 @@ GLFWwindow* create_window(int width, int height, char* name)
     glfwSetKeyCallback(window, key_callback);                                   //Key callback function
     glfwSetErrorCallback(error_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
+
 
     glfwMakeContextCurrent(window);                                             //Makes the window object the current context of the calling thread 
     gladLoadGL();
@@ -207,14 +269,11 @@ int main(void)
 {
     GLFWwindow* window = create_window(1920, 1080, "OpenGL Game Engine");
 
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); //Hides the cursor and forces it into the centre of the window
+
     int multiple_cubs = 0;
 
-    mat4 view = GLM_MAT4_IDENTITY_INIT;
-    vec3 eye = {0.0f, 0.0f, 3.0f};
-    vec3 forward = {0.0f, 0.0f, -1.0f};
-    vec3 up = {0.0f, 1.0f, 0.0f};
-
-    glm_look(eye, forward, up, view);
+    glm_look(camera.eye, camera.forward, camera.up, camera.view);
 
     ////////////////////////////////////////////////////////////////////////////////////////
     //Creating and initializing Shaders, then adding them to a program. 
@@ -328,10 +387,13 @@ int main(void)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
 
     ////////////////////////////////////////////////////////////////////////////////////////
-    //Z-Buffer
+    //Z-Buffer and culling
     //////////////////////////////////////////////////////////////////////////////////////// 
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);   
+    glFrontFace(GL_CCW);  
 
     ////////////////////////////////////////////////////////////////////////////////////////
     //Game loop
@@ -339,86 +401,34 @@ int main(void)
 
     int width, height;
 
-    vec3 result;
-
     load_shader("shader_two.fs");
 
     float u_time = glfwGetTime();   //Gets the time for the shader file
     float currentFrame;             //Holds the value for current frame 
-    float lastFrame;                //Holds the previous frames start time
-    float deltaTime;                //Difference in time between frames
+    float lastFrame;                //Holds the previous frames start time                
+
+    //The ratio of screen width to heigh for projection matrix.
+    float ratio = width / (float) height;
 
     while (!glfwWindowShouldClose(window))  //Checks if the window is meant to close
     {   
-        
         currentFrame = glfwGetTime();           //Set the time equal to the current frame variable 
-        deltaTime = currentFrame - lastFrame;   //Delta time
+        engineState.deltaTime = currentFrame - lastFrame;   //Delta time
         lastFrame = currentFrame;
 
         u_time = glfwGetTime();
-
-        // processInput(window, &eye, &forward, &up, 0.1f);
-
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)   //Checks for W press, multiplies the forward vector generated 
-        {
-            glm_vec3_scale(cameraFront, 1.5f * deltaTime, result);
-            glm_vec3_add(eye, result, eye);
-        }
-
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        {
-            glm_vec3_scale(cameraFront, 1.5f * deltaTime, result);
-            glm_vec3_sub(eye, result, eye);
-        }
-
-        if(glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)    //Rotates the forward vector in the y-axis and then normalises it.
-        {
-            glm_vec3_rotate(forward, -(45*3.14159265358979323846*deltaTime)/180, (vec3){0.0f, 1.0f, 0.0f});
-            glm_vec3_normalize(forward);
-        }
-
-        if(glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-        {
-            glm_vec3_rotate(forward, (45*3.14159265358979323846*deltaTime)/180, (vec3){0.0f, 1.0f, 0.0f});
-            glm_vec3_normalize(forward);
-        }
-
-        if(glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)       //Same as W but for vertical movement instead.
-        {
-            glm_vec3_scale(up, 1.5f * deltaTime, result);
-            glm_vec3_add(eye, result, eye);
-        }
-
-        if(glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-        {
-            glm_vec3_scale(up, 1.5f * deltaTime, result);
-            glm_vec3_sub(eye, result, eye);
-        }
-
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)       //Takes a forward vector and the up vector and cross product them to get the new right 
-        {                                                       //vector and then do the same as the rest.
-            glm_cross(forward, up, result);
-            glm_normalize(result);
-            glm_vec3_scale(result, 1.5f * deltaTime, result);
-            glm_vec3_sub(eye, result, eye);
-        }
-
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        {
-            glm_cross(forward, up, result);
-            glm_normalize(result);
-            glm_vec3_scale(result, 1.5f * deltaTime, result);
-            glm_vec3_add(eye, result, eye);
-        }
-
+        
+        processMovementInput(window);
+        
         // glm_look(eye, forward, up, view);                       //Generate the updated view matrix
-        glm_look(eye, cameraFront, up, view);
+        glm_look(camera.eye, camera.forward, camera.up, camera.view);
 
         //Retrieves the window dimensions and then alters the width and height variables so that the game engine gets the correct values.
         glfwGetFramebufferSize(window, &width, &height);
-        //The ratio of screen width to heigh for projection matrix.
-        const float ratio = width / (float) height;
         
+        //The ratio of screen width to heigh for projection matrix.
+        ratio = width / (float) height;
+
         //This tells OpenGL the size of the window so it can adjust the data accordingly to render to the screen.
         //Essentially it converts the 2D projection space generated into the normalised screen space.
         //The first two arguments are the bottom left coordinates, the third and four coordinates are for the top right.
@@ -433,8 +443,8 @@ int main(void)
         mat4x4_rotate_Y(m, m, glfwGetTime()*0.25);
         //mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 10.f, -10.f);
         //mat4x4_perspective(p, (50*3.14159265358979323846)/180, ratio, 0.1f, 100.0f);
-        glm_perspective((60*3.14159265358979323846)/180, ratio, 0.5f, 100.f, p);
-        mat4x4_mul(mvp, view, m);   //Does M*V
+        glm_perspective((camera.FOV*PI)/180, ratio, 0.5f, 100.f, p);
+        mat4x4_mul(mvp, camera.view, m);   //Does M*V
         mat4x4_mul(mvp, p, mvp);    //Then does (M*V)*P for the final transformation matrix
 
         glUseProgram(program);
@@ -448,8 +458,8 @@ int main(void)
         mat4x4_identity(m);
         //mat4x4_translate(m, 0.0, 0.0, 10.0);
         //mat4x4_rotate_X(m, m, glfwGetTime()*1.5);
-        glm_perspective((60*3.14159265358979323846)/180, ratio, 0.5f, 100.0f, p);
-        mat4x4_mul(mvp, view, m);
+        glm_perspective((camera.FOV*PI)/180, ratio, 0.5f, 100.0f, p);
+        mat4x4_mul(mvp, camera.view, m);
         mat4x4_mul(mvp, p, mvp);
 
         glUseProgram(program_two);
@@ -458,7 +468,14 @@ int main(void)
         glBindVertexArray(vertex_array_two);
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
-        //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        if(engineState.toggleWireMesh)
+        {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }else{
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+
+        printf("\n%f", engineState.deltaTime);
 
         glfwSwapBuffers(window);    //Swaps the back and front buffers, ensures that the amount of time specified in the interval has been met first before the change. 
         glfwPollEvents();           //Checks if any events have been triggered and then updates the windows state accordingly.

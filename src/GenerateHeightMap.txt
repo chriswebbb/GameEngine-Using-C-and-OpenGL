@@ -39,14 +39,13 @@
 #define MAX_DISPLACEMENT (1.0f)
 #define DISPLACEMENT_SIGN_LIMIT (0.3f)
 #define MAX_ITER (200)
-#define NUM_ITER_AT_A_TIME (10)
+#define NUM_ITER_AT_A_TIME (1)
 
 /* Map general information */
 #define MAP_SIZE (10.0f)
-#define MAP_NUM_VERTICES (100)
+#define MAP_NUM_VERTICES (200)
 #define MAP_NUM_TOTAL_VERTICES (MAP_NUM_VERTICES*MAP_NUM_VERTICES)
-#define MAP_NUM_LINES (3* (MAP_NUM_VERTICES - 1) * (MAP_NUM_VERTICES - 1) + \
-               2 * (MAP_NUM_VERTICES - 1))
+#define MAP_NUM_LINES (3* (MAP_NUM_VERTICES - 1) * (MAP_NUM_VERTICES - 1) + 2 * (MAP_NUM_VERTICES - 1))
 
 
 /**********************************************************************
@@ -54,12 +53,12 @@
  *********************************************************************/
 
 static const char* vertex_shader_text =
-"#version 150\n"
+"#version 460\n"
 "uniform mat4 project;\n"
 "uniform mat4 modelview;\n"
-"in float x;\n"
-"in float y;\n"
-"in float z;\n"
+"layout (location = 0) in float x;\n"
+"layout (location = 1) in float y;\n"
+"layout (location = 2) in float z;\n"
 "\n"
 "void main()\n"
 "{\n"
@@ -67,12 +66,64 @@ static const char* vertex_shader_text =
 "}\n";
 
 static const char* fragment_shader_text =
-"#version 150\n"
+"#version 460\n"
 "out vec4 color;\n"
 "void main()\n"
 "{\n"
-"    color = vec4(0.0, 1.0, 0.0, 1.0); \n"
+"    color = vec4(1.0, 0.0, 1.0, 1.0); \n"
 "}\n";
+
+static const char* compute_shader_text = 
+"#version 460\n"
+"layout (local_size_x = 1024, local_size_y = 1024) in;\n"
+"layout (std460, binding = 0) buffer PositionX {\n"
+"	vec3 positionsX[];\n"
+"};\n"
+"layout (std460, binding = 1) buffer PositionY {\n"
+"	vec3 positionsY[];\n"
+"};\n"
+"layout (std460, binding = 2) buffer PositionZ {\n"
+"	vec3 positionsZ[];\n"
+"};\n"
+"static void generate_heightmap__circle(float* center_x, float* center_y, float* size, float* displacement)\n"
+"{\n"
+"float sign;\n"
+"/* random value for element in between [0-1.0] */\n"
+"*center_x = (MAP_SIZE * rand()) / (float) RAND_MAX;\n"
+"*center_y = (MAP_SIZE * rand()) / (float) RAND_MAX;\n"
+"*size = (MAX_CIRCLE_SIZE * rand()) / (float) RAND_MAX;\n"
+"sign = (1.0f * rand()) / (float) RAND_MAX;\n"
+"sign = (sign < DISPLACEMENT_SIGN_LIMIT) ? -1.0f : 1.0f;\n"
+"*displacement = (sign * (MAX_DISPLACEMENT * rand())) / (float) RAND_MAX;\n"
+"}\n"
+"main()\n"
+"{\n"
+"    assert(num_iter > 0);\n"
+"    while(num_iter)\n"
+"    {\n"
+"        float center_x;\n"
+"        float center_z;\n"
+"        float circle_size;\n"
+"        float disp;\n"
+"        size_t ii;\n"
+"        generate_heightmap__circle(&center_x, &center_z, &circle_size, &disp);\n"
+"        disp = disp / 2.0f;\n"
+"        for (ii = 0u ; ii < MAP_NUM_TOTAL_VERTICES ; ++ii)\n"
+"        {\n"
+"            GLfloat dx = center_x - map_vertices[0][ii];\n"
+"            GLfloat dz = center_z - map_vertices[2][ii];\n"
+"            GLfloat pd = (2.0f * (float) sqrt((dx * dx) + (dz * dz))) / circle_size;\n"
+"            if (fabs(pd) <= 1.0f)\n"
+"            {\n"
+"                /* tx,tz is within the circle */\n"
+"                GLfloat new_height = disp + (float) (cos(pd*3.14f)*disp);\n"
+"                map_vertices[1][ii] += new_height;\n"
+"            }\n"
+"        }\n"
+"        --num_iter;\n"
+"    }\n"
+"}\n"
+;
 
 /**********************************************************************
  * Values for shader uniforms
@@ -202,8 +253,7 @@ static GLuint make_shader_program(const char* vs_text, const char* fs_text)
  * Geometry creation functions
  *********************************************************************/
 
-/* Generate vertices and indices for the heightmap
- */
+// Generate vertices and indices for the heightmap
 static void init_map(void)
 {
     int i;
@@ -288,8 +338,7 @@ static void init_map(void)
 #endif
 }
 
-static void generate_heightmap__circle(float* center_x, float* center_y,
-        float* size, float* displacement)
+static void generate_heightmap__circle(float* center_x, float* center_y, float* size, float* displacement)
 {
     float sign;
     /* random value for element in between [0-1.0] */
@@ -423,7 +472,7 @@ int main(int argc, char** argv)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
-    window = glfwCreateWindow(800, 600, "GLFW OpenGL3 Heightmap demo", NULL, NULL);
+    window = glfwCreateWindow(1920, 1080, "GLFW OpenGL3 Heightmap demo", NULL, NULL);
     if (! window )
     {
         glfwTerminate();
@@ -468,9 +517,23 @@ int main(int argc, char** argv)
     init_map();
     make_mesh(shader_program);
 
-    /* Create vao + vbo to store the mesh */
-    /* Create the vbo to store all the information for the grid and the height */
-
+    { // query up the workgroups
+    int work_grp_size[3], work_grp_inv;
+    // maximum global work group (total work in a dispatch)
+    glGetIntegeri_v( GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_size[0] );
+    glGetIntegeri_v( GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &work_grp_size[1] );
+    glGetIntegeri_v( GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &work_grp_size[2] );
+    printf( "max global (total) work group size x:%i y:%i z:%i\n", work_grp_size[0], work_grp_size[1], work_grp_size[2] );
+    // maximum local work group (one shader's slice)
+    glGetIntegeri_v( GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size[0] );
+    glGetIntegeri_v( GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &work_grp_size[1] );
+    glGetIntegeri_v( GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &work_grp_size[2] );
+    printf( "max local (in one shader) work group sizes x:%i y:%i z:%i\n", work_grp_size[0], work_grp_size[1], work_grp_size[2] );
+    // maximum compute shader invocations (x * y * z)
+    glGetIntegerv( GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv );
+    printf( "max computer shader invocations %i\n", work_grp_inv );
+    }
+    
     /* setup the scene ready for rendering */
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);

@@ -3,12 +3,42 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+//By defining STB_IMAGE_IMPLEMENTATION the preprocessor modifies the header file such that it only contains the relevant definition source code, effectively turning the header file into a .cpp file, and that's about it
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #include "linmath.h"
 #include <CGLM/cglm.h>
 
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
+
+typedef struct gameEngineState
+{
+    float windowHeight;
+    float windowWidth;
+    int toggleWireMesh;
+    float deltaTime;    //Difference in time between frames
+}gameEngineState;
+
+typedef struct cameraState
+{
+    float yaw;	// yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right so we initially rotate a bit to the left.
+    float pitch;
+    mat4 view;
+    vec3 eye;
+    vec3 forward;
+    vec3 up;
+    float FOV;
+}cameraState;
+
+typedef struct Vertex
+{
+    vec3 pos;
+    vec3 col;
+    vec2 texture;
+} Vertex;
 
 static const char* vertex_shader_text =
 "#version 460\n"
