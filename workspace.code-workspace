@@ -12,7 +12,9 @@
 			"cglm.h": "c",
 			"mat4.h": "c",
 			"stdio.h": "c",
-			"main.h": "c"
+			"main.h": "c",
+			"type_traits": "c",
+			"utils.h": "c"
 		}
 	}
 }
