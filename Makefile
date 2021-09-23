@@ -4,7 +4,7 @@ SHELL = /bin/sh
 
 CC = gcc
 CFLAGS = -std=c11 -g -Wall
-CFLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Ilib/noise -Ilib/glfw/deps -Isrc
+CFLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Ilib/noise -Ilib/glfw/deps -Isrc -Isrc/utils -Isrc/gfx 
 
 #glfw contains glad2 so therefore to use it remove glad.o as that is the glad library, causes linker errors
 #LDFLAGS +=  lib/cglm/build/libcglm.a lib/glfw/build/src/libglfw3.a lib/noise/libnoise.a -lm

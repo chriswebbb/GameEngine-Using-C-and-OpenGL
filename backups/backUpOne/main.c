@@ -326,8 +326,8 @@ int main(void)
     //Creating and initializing VBO ( Vertex Buffer Object )
     ////////////////////////////////////////////////////////////////////////////////////////
 
-    BUFF vbo = buff_create(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW);
-    buff_BindNData(vbo, &vertices, sizeof(vertices));
+    VBO vbo = vbo_create(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW);
+    vbo_BindNData(vbo, &vertices, sizeof(vertices));
     // GLuint vertex_buffer;                                                       //Holds the ID of the buffer containing the vertex data.
     // glGenBuffers(1, &vertex_buffer);                                            //Generates a buffer object name
     // glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);                               //Takes the buffer object name and binds it to a buffer of the type specified.
@@ -492,7 +492,7 @@ int main(void)
     }
 
     glDeleteVertexArrays(1, vertex_array);
-    glDeleteBuffers(1, vbo.buffID);
+    glDeleteBuffers(1, vbo.vboID);
     glDeleteVertexArrays(1, vertex_array_two);
     glDeleteBuffers(1, vertex_buffer_two);
     glDeleteProgram(program);

@@ -9,7 +9,7 @@
       "stopAtEntry": false,
       "cwd": "c:\\Users\\mater\\OneDrive\\Documents\\3DGameInCUsingOpenGL",
       "environment": [],
-      "program": "c:\\Users\\mater\\OneDrive\\Documents\\3DGameInCUsingOpenGL\\src\\main",
+      "program": "c:\\Users\\mater\\OneDrive\\Documents\\3DGameInCUsingOpenGL\\build\\Debug\\outDebug",
       "internalConsoleOptions": "openOnSessionStart",
       "MIMode": "gdb",
       "miDebuggerPath": "C:\\Program Files (x86)\\mingw-w64\\i686-8.1.0-posix-sjlj-rt_v6-rev0\\mingw32\\bin\\gdb.exe",
