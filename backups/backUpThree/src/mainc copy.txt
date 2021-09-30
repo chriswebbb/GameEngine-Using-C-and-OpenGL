@@ -3,11 +3,8 @@
 #define WINDOWHEIGHT 1920
 #define WINDOWWIDTH 1080
 #define PI 3.14159265358979323846f
-#define NUMOFOCTAVES 12
-#define MAP_NUM_VERTICES_XAXIS 1000
-#define MAP_NUM_VERTICES_ZAXIS 1000
-#define RANDOM_SAMPLE 10
-#define SCALE 0.001f
+#define MAP_NUM_VERTICES_XAXIS 3
+#define MAP_NUM_VERTICES_ZAXIS 3
 
 gameEngineState engineState = { .windowHeight = WINDOWHEIGHT, 
                                 .windowWidth = WINDOWWIDTH, 
@@ -18,7 +15,7 @@ cameraState camera = {  .yaw = -90.0f,
                         .pitch = 0.0f, 
                         .view = GLM_MAT4_IDENTITY_INIT, 
                         .eye = {0.0f, 0.0f, 3.0f},
-                        .forward = {0.0f, 0.0f, -1.0f},
+                        .forward = {0.0f, 0.0f, 1.0f},
                         .up = {0.0f, 1.0f, 0.0f}, 
                         .FOV = 100.0f};
 
@@ -61,12 +58,8 @@ static const Vertex vertices_two[] = {
     { {  2.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } }   
 };
 
-float random[MAP_NUM_VERTICES_XAXIS];
-float noise[MAP_NUM_VERTICES_XAXIS];
-float random2D[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
-float noise2D[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
 Vertex meshForHeight[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
-unsigned int indicesForMesh[2 * ((3 * (MAP_NUM_VERTICES_XAXIS - 1) * (MAP_NUM_VERTICES_ZAXIS - 1)) + MAP_NUM_VERTICES_XAXIS + MAP_NUM_VERTICES_ZAXIS - 2)];
+int indicesForMesh[2*(3*MAP_NUM_VERTICES_XAXIS*MAP_NUM_VERTICES_ZAXIS + MAP_NUM_VERTICES_XAXIS + MAP_NUM_VERTICES_ZAXIS)];
 
 //Counter-ClockWise winding
 unsigned int indices[] = {  //front
@@ -89,10 +82,8 @@ unsigned int indices[] = {  //front
                             6, 2, 7
 };
 
-void updateMesh(Vertex* mesh, float* noise);
-void one_dimensional_perlin_noise(float* random, float* noise, int octaves);
-void two_dimensional_perlin_noise(float* random, float* noiseArray, int octave);
-void init_mesh(Vertex* mesh, unsigned int* indices, float* noise);
+
+void init_mesh(Vertex* mesh, int* indices);
 void shader_error(GLuint shader);
 static void error_callback(int error, const char* description);
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -102,11 +93,6 @@ GLFWwindow* create_window(int width, int height, char* name);
 
 int main(void)
 {
-    if(CGLM_CONFIG_CLIP_CONTROL == CGLM_CLIP_CONTROL_LH_NO)
-    {
-        printf("\n\n\nYEEEEEET\n\n\n");
-    }
-
     GLFWwindow* window = create_window(1920, 1080, "OpenGL Game Engine");
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); //Hides the cursor and forces it into the centre of the window
@@ -116,37 +102,19 @@ int main(void)
     glm_look(camera.eye, camera.forward, camera.up, camera.view);
 
     printf("\n\n%i", &meshForHeight[0]);
-    
-    //one_dimensional_perlin_noise(&random, &noise, 2);
-    
-    two_dimensional_perlin_noise(&random2D, &noise2D, NUMOFOCTAVES);
 
-    init_mesh(&meshForHeight, &indicesForMesh, &noise2D);
+    init_mesh(&meshForHeight, &indicesForMesh);
 
     int yeet = 0;
-    // for(int j = 0; j < MAP_NUM_VERTICES_ZAXIS * MAP_NUM_VERTICES_XAXIS;  j++)
-    // {
-    //     printf("\nindex -> %i   z -> %.2f   x -> %.2f", j, meshForHeight[j].pos[2], meshForHeight[j].pos[0]);
-    // }
+    for(int j = 0; j < MAP_NUM_VERTICES_ZAXIS * MAP_NUM_VERTICES_XAXIS;  j++)
+    {
+        printf("\nz -> %.2f   x -> %.2f", meshForHeight[j].pos[2], meshForHeight[j].pos[0]);
+    }
 
-    // printf("\n");
-
-    // for(int w = 0; w < 2 * ((3 * (MAP_NUM_VERTICES_XAXIS - 1) * (MAP_NUM_VERTICES_ZAXIS - 1)) + MAP_NUM_VERTICES_XAXIS + MAP_NUM_VERTICES_ZAXIS - 2); w++)
-    // {
-    //     printf("_%i_", indicesForMesh[w]);
-    // }
-
-    
-
-    // printf("\n\n");
-    // for(int z = 0; z < MAP_NUM_VERTICES_ZAXIS; z++){
-    //     for(int x = 0; x < MAP_NUM_VERTICES_ZAXIS; x++)
-    //     {
-    //         int index = z * MAP_NUM_VERTICES_XAXIS + x;
-    //         printf(" %.3f", noise2D[index]);
-    //     }
-    //     printf("\n");
-    // }
+    for(int w = 0; w < 2*(3*MAP_NUM_VERTICES_XAXIS*MAP_NUM_VERTICES_ZAXIS + MAP_NUM_VERTICES_XAXIS + MAP_NUM_VERTICES_ZAXIS); w++)
+    {
+        printf("_%i_", indicesForMesh[w]);
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////
     //Shaders
@@ -228,7 +196,7 @@ int main(void)
 
     //1. Generate and bind vertex buffer object and copy the vertex data into the buffer
     BUFF vboThree = buff_create(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW);
-    buff_BindNData(vboThree, meshForHeight, sizeof(meshForHeight));
+    buff_BindNData(vboThree, &meshForHeight, sizeof(vertices));
 
     //2. Generate and bind vertex array
     GLuint vaoThree = vao_create();
@@ -239,7 +207,7 @@ int main(void)
 
     //3. Generate and bind the element buffer object and then populate the buffer
     BUFF eboThree = buff_create(GL_ELEMENT_ARRAY_BUFFER, GL_DYNAMIC_DRAW);
-    buff_BindNData(eboThree, indicesForMesh, sizeof(indicesForMesh));
+    buff_BindNData(eboThree, &indicesForMesh, sizeof(indicesForMesh));
 
     ////////////////////////////////////////////////////////////////////////////////////////
     //Axis Generation
@@ -290,15 +258,6 @@ int main(void)
 
     while (!glfwWindowShouldClose(window))  //Checks if the window is meant to close
     {   
-
-        if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
-        {
-            two_dimensional_perlin_noise(&random2D, &noise2D, NUMOFOCTAVES);
-            updateMesh(&meshForHeight, &noise2D);
-            buff_bind(vboThree);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Vertex) * MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS, &meshForHeight);
-        }
-
         currentFrame = glfwGetTime();           //Set the time equal to the current frame variable 
         engineState.deltaTime = currentFrame - lastFrame;   //Delta time
         lastFrame = currentFrame;
@@ -336,7 +295,7 @@ int main(void)
         glUseProgram(shader.programID);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) &mvp);
         glUniform1f(u_time_location, u_time);
-        //glBindVertexArray(vao);    //Binds the vertex array object declared above to t
+        glBindVertexArray(vao);    //Binds the vertex array object declared above to t
         //glDrawArrays(GL_TRIANGLES, 0, 6);   //Draws the triangles specified by the vertex array object
         //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
         //glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
@@ -348,19 +307,25 @@ int main(void)
         //mat4x4_translate(m, 3.0, 0.0, 0.0);
         //mat4x4_rotate_X(m, m, glfwGetTime()*1.5);
         glm_perspective((camera.FOV*PI)/180, ratio, 0.01f, 100.0f, p);
-        mat4x4_mul(mvp, camera.view, m);
-        mat4x4_mul(mvp, p, mvp);
+        mat4x4_mul(mvp, m, camera.view);
+        mat4x4_mul(mvp, mvp, p);
 
         glUseProgram(shaderTwo.programID);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) &mvp);
         glUniform1f(u_time_location, u_time);
-        //glBindVertexArray(vaoTwo);
-        //glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(vaoTwo);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
+        mat4x4_identity(m);
+        glm_perspective((camera.FOV*PI)/180, ratio, 0.01f, 100.0f, p);
+        mat4x4_mul(mvp, camera.view, m);
+        mat4x4_mul(mvp, p, mvp);
+        glUseProgram(shaderTwo.programID);
+        glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) &mvp);
         glUniform1f(u_time_location, u_time);
         glBindVertexArray(vaoThree);
-        glDrawElements(GL_LINES, 2 * ((3 * (MAP_NUM_VERTICES_XAXIS - 1) * (MAP_NUM_VERTICES_ZAXIS - 1)) + MAP_NUM_VERTICES_XAXIS + MAP_NUM_VERTICES_ZAXIS - 2), GL_UNSIGNED_INT,0);
-    
+        glDrawElements(GL_LINES, 170, GL_UNSIGNED_INT,0);
+        
         if(engineState.toggleWireMesh)
         {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -372,7 +337,6 @@ int main(void)
 
         glfwSwapBuffers(window);    //Swaps the back and front buffers, ensures that the amount of time specified in the interval has been met first before the change. 
         glfwPollEvents();           //Checks if any events have been triggered and then updates the windows state accordingly.
-
     }
 
     glDeleteVertexArrays(1, vao);
@@ -388,76 +352,7 @@ int main(void)
     exit(EXIT_SUCCESS);
 }
 
-void one_dimensional_perlin_noise(float* random, float* noiseArray, int octaves)
-{
-    for(int index = 0; index < MAP_NUM_VERTICES_XAXIS; index++) 
-    {
-        random[index] = (float)rand()/(float)RAND_MAX; 
-    }
-
-    for(int x = 0; x < MAP_NUM_VERTICES_XAXIS; x++) 
-    {   
-        float noise = 0;                                    //Variable used to hold accumulated value.
-        float scale = 0.5f;
-        float scaleAcc = 0.0f;
-
-        for(int o = 0; o < octaves;  o++)
-        {
-            int period = MAP_NUM_VERTICES_XAXIS >> o;
-            int sample1 = (x / period) * period;
-            int sample2 = (sample1 + period) % MAP_NUM_VERTICES_XAXIS;
-
-            float fBlend = (float)(x-sample1) / (float)period;
-            float y = (1.0f - fBlend) * random[sample1] + fBlend * random[sample2];
-
-            noise += y * scale;
-            scaleAcc += scale;
-            scale = scale / 2.0f;
-        }
-        noiseArray[x] = noise / scaleAcc;
-        //printf("\n%.3f", noiseArray[x]);
-    }
-}
-
-void two_dimensional_perlin_noise(float* random, float* noiseArray, int octave)
-{
-    for(int index = 0; index < MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS; index++) 
-    {
-        random[index] = (float)rand()/(float)RAND_MAX; 
-    }
-
-    for(int z = 0; z < MAP_NUM_VERTICES_XAXIS; z++){
-        for(int x = 0; x < MAP_NUM_VERTICES_ZAXIS; x++) 
-        {   
-            float noise = 0;                                    //Variable used to hold accumulated value.
-            float scale = 1.0f;
-            float scaleAcc = 0.0f;
-
-            for(int o = 0; o < octave;  o++)
-            {
-                int period = MAP_NUM_VERTICES_XAXIS >> o;
-                int sampleX1 = (x / period) * period;
-                int sampleZ1 = (z / period) * period;
-                int sampleX2 = (sampleX1 + period) % MAP_NUM_VERTICES_XAXIS;
-                int sampleZ2 = (sampleZ1 + period) % MAP_NUM_VERTICES_XAXIS;
-
-                float blendX = (float)(x-sampleX1) / (float)period;
-                float blendY = (float)(z-sampleZ1) / (float)period;
-                float yT = (1.0f - blendX) * random[sampleZ1 * MAP_NUM_VERTICES_XAXIS + sampleX1] + blendX * random[sampleZ1 * MAP_NUM_VERTICES_XAXIS + sampleX2];
-                float yB = (1.0f - blendX) * random[sampleZ2 * MAP_NUM_VERTICES_XAXIS + sampleX1] + blendX * random[sampleZ2 * MAP_NUM_VERTICES_XAXIS + sampleX2];
-                
-                noise += (blendY * (yB-yT) + yT) * scale;
-                scaleAcc += scale;
-                scale = scale / 2.0f;
-            }
-            noiseArray[z * MAP_NUM_VERTICES_XAXIS + x] = noise / scaleAcc;
-            //printf("\n%.3f", noiseArray[x]);
-        }
-    }
-
-}
-
-void init_mesh(Vertex* mesh, unsigned int* indices, float* noise)
+void init_mesh(Vertex* mesh, int* indices)
 {   
     printf("\n\n%i\n\n", &mesh[0]);
     int index = 0;
@@ -466,80 +361,48 @@ void init_mesh(Vertex* mesh, unsigned int* indices, float* noise)
     {
         for(int i = 0; i < MAP_NUM_VERTICES_XAXIS;  i++)
         {
-            index = k * MAP_NUM_VERTICES_XAXIS + i;
+            index = k * MAP_NUM_VERTICES_ZAXIS + i;
 
-            mesh[index].pos[0] = SCALE * (float)i;//0.5f * (float)(i - (int)(MAP_NUM_VERTICES_XAXIS/2));
+            mesh[index].pos[0] = (float)i;//0.5f * (float)(i - (int)(MAP_NUM_VERTICES_XAXIS/2));
             //printf("%.2f", mesh[index].pos[0]);
             mesh[index].pos[1] = 0.0f;
-            mesh[index].pos[2] = SCALE * (float)k;
+            mesh[index].pos[2] = (float)k;
         }
     }
 
     index = 0;
     // //Initialise indices
 
-    for (int i = 0 ; i < MAP_NUM_VERTICES_ZAXIS - 1 ; i++)
-    {
-        indices[index++] = (i + 1) * MAP_NUM_VERTICES_XAXIS - 1;
-        //printf("%i", i);
-        indices[index++] = (i + 2) * MAP_NUM_VERTICES_XAXIS - 1;
-    }
+    // for (int i = 0 ; i < MAP_NUM_VERTICES_XAXIS - 1 ; i++)
+    // {
+    //     indices[index++] = (i + 1) * MAP_NUM_VERTICES_XAXIS - 1;
+    //     indices[index++] = (i + 2) * MAP_NUM_VERTICES_XAXIS - 1;
+    // }
 
-    for (int i = 0 ; i < MAP_NUM_VERTICES_XAXIS - 1 ; ++i)
-    {
-        indices[index++] = MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS - 1 - i;
-        indices[index++] = MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS - i - 2;
-    }
+    // for (int i = 0 ; i < MAP_NUM_VERTICES_ZAXIS -1 ; ++i)
+    // {
+    //     indices[index++] = (MAP_NUM_VERTICES_ZAXIS - 1) * MAP_NUM_VERTICES_ZAXIS + i;
+    //     indices[index++] = (MAP_NUM_VERTICES_ZAXIS - 1) * MAP_NUM_VERTICES_ZAXIS + i + 1;
+    // }
 
     for(int k = 0; k < (MAP_NUM_VERTICES_ZAXIS - 1);  k++)
     {
         for(int i = 0; i < (MAP_NUM_VERTICES_XAXIS - 1);  i++)
         {
-            //Horizontal lines
-            indices[index++] = k * MAP_NUM_VERTICES_XAXIS + i;
+            indices[index++] = k * MAP_NUM_VERTICES_ZAXIS + i;
             //printf("\n\n%i\n\n", indices[index - 1]);
-            indices[index++] = k * MAP_NUM_VERTICES_XAXIS + i + 1;
+            indices[index++] = k * MAP_NUM_VERTICES_ZAXIS + i + 1;
 
-            //Vertical lines
-            indices[index++] = k * MAP_NUM_VERTICES_XAXIS + i;
-            indices[index++] = k * MAP_NUM_VERTICES_XAXIS + i + MAP_NUM_VERTICES_XAXIS;
+            indices[index++] = k * MAP_NUM_VERTICES_ZAXIS + i;
+            indices[index++] = k * MAP_NUM_VERTICES_ZAXIS + i + MAP_NUM_VERTICES_XAXIS;
 
-
-            indices[index++] = k * MAP_NUM_VERTICES_XAXIS + i;
-            indices[index++] = k * MAP_NUM_VERTICES_XAXIS + i + MAP_NUM_VERTICES_XAXIS + 1;
-        }
-    }
-
-    index = 0;
-
-    for(int k = 0; k < MAP_NUM_VERTICES_ZAXIS; k++)
-    {
-        for(int i = 0; i < MAP_NUM_VERTICES_XAXIS;  i++)
-        {
-            index = k * MAP_NUM_VERTICES_XAXIS + i;
-
-            mesh[index].pos[1] = 5.0f * noise[index];
-            
+            indices[index++] = k * MAP_NUM_VERTICES_ZAXIS + i;
+            indices[index++] = k * MAP_NUM_VERTICES_ZAXIS + i + MAP_NUM_VERTICES_XAXIS + 1;
         }
     }
 
     printf("Error checking");
 
-}
-
-void updateMesh(Vertex* mesh, float* noise)
-{
-    int index = 0;
-
-    for(int k = 0; k < MAP_NUM_VERTICES_ZAXIS; k++)
-    {
-        for(int i = 0; i < MAP_NUM_VERTICES_XAXIS;  i++)
-        {
-            index = k * MAP_NUM_VERTICES_XAXIS + i;
-
-            mesh[index].pos[1] = 5.0f * noise[index];
-        }
-    }
 }
 
 void shader_error(GLuint shader)

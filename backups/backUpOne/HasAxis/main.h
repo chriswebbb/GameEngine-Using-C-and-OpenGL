@@ -1,22 +1,21 @@
-#ifndef UTILS_H
-#define UTILS_H
-
+#ifndef MAIN_H
+#define MAIN_H
 //By defining STB_IMAGE_IMPLEMENTATION the preprocessor modifies the header file such that it only contains the relevant definition source code, effectively turning the header file into a .cpp file, and that's about it
 #define STB_IMAGE_IMPLEMENTATION
 //#include "stb_image.h"
 
+#define GLAD_GL_IMPLEMENTATION
+#include <GLAD/glad.h>
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+
 #include "linmath.h"
-
-#define CGLM_FORCE_LEFT_HANDED
-
 #include <CGLM/cglm.h>
 
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <string.h>
-
-#define PI 3.14159265358979323846f
 
 typedef struct gameEngineState
 {
@@ -44,23 +43,18 @@ typedef struct Vertex
     vec2 texture;
 }Vertex;
 
-typedef struct mouseState{
-    float lastX, lastY;
-    int firstMouse;
-}mouseState;
-
 static const char* vertex_shader_text =
 "#version 460\n"
 "uniform mat4 MVP;\n"
 "in vec3 vCol;\n"
 "in vec3 vPos;\n"
 "out vec3 color;\n"
-"out vec3 position;\n"
+"out vec4 position;\n"
 "out vec2 u_resolution;\n"
 "void main()\n"
 "{\n"
-"   gl_Position = MVP * vec4(vPos, 1.0);\n"
-"   position = vPos;\n"
+"   gl_Position = MVP * vec4(vPos, 1.0);"
+"   position = MVP * vec4(vPos, 1.0);\n"
 "   color = vCol;\n"
 "   u_resolution = vec2(1.0, 1.0);\n"
 "}\n";
@@ -68,17 +62,17 @@ static const char* vertex_shader_text =
 static const char* fragment_shader_text =
 "#version 460\n"
 "in vec3 color;\n"
-"in vec3 position;\n"
+"in vec4 position;\n"
 "out vec4 fragment;\n"
 "void main()\n"
 "{\n"
-"    fragment = vec4(position.x, position.y, position.z, 1.0);\n"
+"    fragment = vec4(1.0, 1.0, 1.0, 0.0);\n"
 "}\n";
 
 static const char* fragment_shader_text_two =
 "#version 460\n"
 "in vec3 color;\n"
-"in vec3 position;\n"
+"in vec4 position;\n"
 "in vec2 u_resolution;\n"
 "out vec4 fragment;\n"
 "\n"
@@ -123,7 +117,7 @@ static const char* fragment_shader_text_two =
 static const char* fragment_shader_text_three =
 "#version 460\n"
 "in vec3 color;\n"
-"in vec3 position;\n"
+"in vec4 position;\n"
 "in vec2 u_resolution;\n"
 "out vec4 fragment;\n"
 "uniform float u_time;\n"

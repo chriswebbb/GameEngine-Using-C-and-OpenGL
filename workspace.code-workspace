@@ -14,7 +14,10 @@
 			"stdio.h": "c",
 			"main.h": "c",
 			"type_traits": "c",
-			"utils.h": "c"
+			"utils.h": "c",
+			"cam.h": "c",
+			"persp.h": "c",
+			"plane.h": "c"
 		}
 	}
 }

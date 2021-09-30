@@ -1,7 +1,7 @@
 #version 460
 #define NUM_OCTAVES 100
 in vec3 color;
-in vec3 position;
+in vec4 position;
 in vec2 u_resolution;
 out vec4 fragment;
 uniform float u_time;
@@ -66,5 +66,6 @@ void main() {
                 vec3(0.666667,1,1),
                 clamp(length(r.x),length(r.y),1.0));
     color = mix(color, vec3(1.0, 0.9, 1.0), color);
-    gl_FragColor = vec4((f*f*f+.6*f*f+.5*f)*color,1.);
+    //gl_FragColor = vec4((f*f*f+.6*f*f+.5*f)*color,1.);
+	gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
 }

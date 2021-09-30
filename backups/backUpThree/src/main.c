@@ -3,11 +3,9 @@
 #define WINDOWHEIGHT 1920
 #define WINDOWWIDTH 1080
 #define PI 3.14159265358979323846f
-#define NUMOFOCTAVES 12
-#define MAP_NUM_VERTICES_XAXIS 1000
-#define MAP_NUM_VERTICES_ZAXIS 1000
-#define RANDOM_SAMPLE 10
-#define SCALE 0.001f
+#define MAP_NUM_VERTICES_XAXIS 100
+#define MAP_NUM_VERTICES_ZAXIS 100
+#define SCALE 0.01f
 
 gameEngineState engineState = { .windowHeight = WINDOWHEIGHT, 
                                 .windowWidth = WINDOWWIDTH, 
@@ -63,8 +61,6 @@ static const Vertex vertices_two[] = {
 
 float random[MAP_NUM_VERTICES_XAXIS];
 float noise[MAP_NUM_VERTICES_XAXIS];
-float random2D[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
-float noise2D[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
 Vertex meshForHeight[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
 unsigned int indicesForMesh[2 * ((3 * (MAP_NUM_VERTICES_XAXIS - 1) * (MAP_NUM_VERTICES_ZAXIS - 1)) + MAP_NUM_VERTICES_XAXIS + MAP_NUM_VERTICES_ZAXIS - 2)];
 
@@ -89,10 +85,8 @@ unsigned int indices[] = {  //front
                             6, 2, 7
 };
 
-void updateMesh(Vertex* mesh, float* noise);
 void one_dimensional_perlin_noise(float* random, float* noise, int octaves);
-void two_dimensional_perlin_noise(float* random, float* noiseArray, int octave);
-void init_mesh(Vertex* mesh, unsigned int* indices, float* noise);
+void init_mesh(Vertex* mesh, unsigned int* indices);
 void shader_error(GLuint shader);
 static void error_callback(int error, const char* description);
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -116,12 +110,8 @@ int main(void)
     glm_look(camera.eye, camera.forward, camera.up, camera.view);
 
     printf("\n\n%i", &meshForHeight[0]);
-    
-    //one_dimensional_perlin_noise(&random, &noise, 2);
-    
-    two_dimensional_perlin_noise(&random2D, &noise2D, NUMOFOCTAVES);
 
-    init_mesh(&meshForHeight, &indicesForMesh, &noise2D);
+    init_mesh(&meshForHeight, &indicesForMesh);
 
     int yeet = 0;
     // for(int j = 0; j < MAP_NUM_VERTICES_ZAXIS * MAP_NUM_VERTICES_XAXIS;  j++)
@@ -136,17 +126,14 @@ int main(void)
     //     printf("_%i_", indicesForMesh[w]);
     // }
 
-    
+    one_dimensional_perlin_noise(&random, &noise, 5);
 
     // printf("\n\n");
-    // for(int z = 0; z < MAP_NUM_VERTICES_ZAXIS; z++){
-    //     for(int x = 0; x < MAP_NUM_VERTICES_ZAXIS; x++)
-    //     {
-    //         int index = z * MAP_NUM_VERTICES_XAXIS + x;
-    //         printf(" %.3f", noise2D[index]);
-    //     }
-    //     printf("\n");
-    // }
+
+    for(int index = 0; index < MAP_NUM_VERTICES_XAXIS; index++) 
+    {   
+        printf(", %.3f", noise[index]);
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////
     //Shaders
@@ -290,15 +277,6 @@ int main(void)
 
     while (!glfwWindowShouldClose(window))  //Checks if the window is meant to close
     {   
-
-        if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
-        {
-            two_dimensional_perlin_noise(&random2D, &noise2D, NUMOFOCTAVES);
-            updateMesh(&meshForHeight, &noise2D);
-            buff_bind(vboThree);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Vertex) * MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS, &meshForHeight);
-        }
-
         currentFrame = glfwGetTime();           //Set the time equal to the current frame variable 
         engineState.deltaTime = currentFrame - lastFrame;   //Delta time
         lastFrame = currentFrame;
@@ -360,7 +338,7 @@ int main(void)
         glUniform1f(u_time_location, u_time);
         glBindVertexArray(vaoThree);
         glDrawElements(GL_LINES, 2 * ((3 * (MAP_NUM_VERTICES_XAXIS - 1) * (MAP_NUM_VERTICES_ZAXIS - 1)) + MAP_NUM_VERTICES_XAXIS + MAP_NUM_VERTICES_ZAXIS - 2), GL_UNSIGNED_INT,0);
-    
+        
         if(engineState.toggleWireMesh)
         {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -372,7 +350,6 @@ int main(void)
 
         glfwSwapBuffers(window);    //Swaps the back and front buffers, ensures that the amount of time specified in the interval has been met first before the change. 
         glfwPollEvents();           //Checks if any events have been triggered and then updates the windows state accordingly.
-
     }
 
     glDeleteVertexArrays(1, vao);
@@ -388,76 +365,35 @@ int main(void)
     exit(EXIT_SUCCESS);
 }
 
-void one_dimensional_perlin_noise(float* random, float* noiseArray, int octaves)
+void one_dimensional_perlin_noise(float* random, float* noise, int octaves)
 {
-    for(int index = 0; index < MAP_NUM_VERTICES_XAXIS; index++) 
-    {
-        random[index] = (float)rand()/(float)RAND_MAX; 
-    }
+    for(int index = 0; index < MAP_NUM_VERTICES_XAXIS; index++) random[index] = (float)rand()/(float)RAND_MAX; 
 
     for(int x = 0; x < MAP_NUM_VERTICES_XAXIS; x++) 
     {   
-        float noise = 0;                                    //Variable used to hold accumulated value.
-        float scale = 0.5f;
+        float fnoise = 0;                                    //Variable used to hold accumulated value.
+        float scale = 1.0f;
         float scaleAcc = 0.0f;
 
         for(int o = 0; o < octaves;  o++)
         {
-            int period = MAP_NUM_VERTICES_XAXIS >> o;
-            int sample1 = (x / period) * period;
-            int sample2 = (sample1 + period) % MAP_NUM_VERTICES_XAXIS;
+            int nPitch = MAP_NUM_VERTICES_XAXIS >> o;
+            int nSample1 = (x / nPitch) * nPitch;
+            int nSample2 = (nSample2 + nPitch) % MAP_NUM_VERTICES_XAXIS;
 
-            float fBlend = (float)(x-sample1) / (float)period;
-            float y = (1.0f - fBlend) * random[sample1] + fBlend * random[sample2];
+            float fBlend = (float)(x-nSample1) / (float)nPitch;
+            float fSample = (1.0f - fBlend) * random[nSample1] + fBlend * random[nSample2];
 
-            noise += y * scale;
+            fnoise += fSample * scale;
             scaleAcc += scale;
             scale = scale / 2.0f;
         }
-        noiseArray[x] = noise / scaleAcc;
-        //printf("\n%.3f", noiseArray[x]);
+        noise[x] = fnoise / scaleAcc;
+        //printf(", %.3f", random[x]);
     }
 }
 
-void two_dimensional_perlin_noise(float* random, float* noiseArray, int octave)
-{
-    for(int index = 0; index < MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS; index++) 
-    {
-        random[index] = (float)rand()/(float)RAND_MAX; 
-    }
-
-    for(int z = 0; z < MAP_NUM_VERTICES_XAXIS; z++){
-        for(int x = 0; x < MAP_NUM_VERTICES_ZAXIS; x++) 
-        {   
-            float noise = 0;                                    //Variable used to hold accumulated value.
-            float scale = 1.0f;
-            float scaleAcc = 0.0f;
-
-            for(int o = 0; o < octave;  o++)
-            {
-                int period = MAP_NUM_VERTICES_XAXIS >> o;
-                int sampleX1 = (x / period) * period;
-                int sampleZ1 = (z / period) * period;
-                int sampleX2 = (sampleX1 + period) % MAP_NUM_VERTICES_XAXIS;
-                int sampleZ2 = (sampleZ1 + period) % MAP_NUM_VERTICES_XAXIS;
-
-                float blendX = (float)(x-sampleX1) / (float)period;
-                float blendY = (float)(z-sampleZ1) / (float)period;
-                float yT = (1.0f - blendX) * random[sampleZ1 * MAP_NUM_VERTICES_XAXIS + sampleX1] + blendX * random[sampleZ1 * MAP_NUM_VERTICES_XAXIS + sampleX2];
-                float yB = (1.0f - blendX) * random[sampleZ2 * MAP_NUM_VERTICES_XAXIS + sampleX1] + blendX * random[sampleZ2 * MAP_NUM_VERTICES_XAXIS + sampleX2];
-                
-                noise += (blendY * (yB-yT) + yT) * scale;
-                scaleAcc += scale;
-                scale = scale / 2.0f;
-            }
-            noiseArray[z * MAP_NUM_VERTICES_XAXIS + x] = noise / scaleAcc;
-            //printf("\n%.3f", noiseArray[x]);
-        }
-    }
-
-}
-
-void init_mesh(Vertex* mesh, unsigned int* indices, float* noise)
+void init_mesh(Vertex* mesh, unsigned int* indices)
 {   
     printf("\n\n%i\n\n", &mesh[0]);
     int index = 0;
@@ -518,28 +454,13 @@ void init_mesh(Vertex* mesh, unsigned int* indices, float* noise)
         {
             index = k * MAP_NUM_VERTICES_XAXIS + i;
 
-            mesh[index].pos[1] = 5.0f * noise[index];
+            mesh[index].pos[1] = (float) SCALE *(rand() % 10);
             
         }
     }
 
     printf("Error checking");
 
-}
-
-void updateMesh(Vertex* mesh, float* noise)
-{
-    int index = 0;
-
-    for(int k = 0; k < MAP_NUM_VERTICES_ZAXIS; k++)
-    {
-        for(int i = 0; i < MAP_NUM_VERTICES_XAXIS;  i++)
-        {
-            index = k * MAP_NUM_VERTICES_XAXIS + i;
-
-            mesh[index].pos[1] = 5.0f * noise[index];
-        }
-    }
 }
 
 void shader_error(GLuint shader)

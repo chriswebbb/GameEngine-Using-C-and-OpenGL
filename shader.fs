@@ -1,6 +1,6 @@
 #version 460
 in vec3 color;
-in vec3 position;
+in vec4 position;
 in vec2 u_resolution;
 out vec4 fragment;
 uniform float u_time;
@@ -61,5 +61,6 @@ void main() {
     color = mix(color,
                 vec3(0.666667,1,1),
                 clamp(length(r.x),0.0,1.0));
-    gl_FragColor = vec4((f*f*f+.6*f*f+.5*f)*color,1.);
+    //gl_FragColor = vec4((f*f*f+.6*f*f+.5*f)*color,1.);
+    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
 }
