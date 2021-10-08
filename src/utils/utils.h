@@ -7,7 +7,7 @@
 
 #include "linmath.h"
 
-#define CGLM_FORCE_LEFT_HANDED
+//#define CGLM_FORCE_LEFT_HANDED
 
 #include <CGLM/cglm.h>
 
@@ -40,7 +40,7 @@ typedef struct cameraState
 typedef struct Vertex
 {
     vec3 pos;
-    vec3 col;
+    vec3 norm;
     vec2 texture;
 }Vertex;
 

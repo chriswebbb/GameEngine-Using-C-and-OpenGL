@@ -3,11 +3,11 @@
 #define WINDOWHEIGHT 1920
 #define WINDOWWIDTH 1080
 #define PI 3.14159265358979323846f
-#define NUMOFOCTAVES 12
+#define NUMOFOCTAVES 7
 #define MAP_NUM_VERTICES_XAXIS 1000
 #define MAP_NUM_VERTICES_ZAXIS 1000
-#define RANDOM_SAMPLE 10
-#define SCALE 0.001f
+#define RANDOM_SAMPLE 8
+#define SCALE 0.002f
 
 gameEngineState engineState = { .windowHeight = WINDOWHEIGHT, 
                                 .windowWidth = WINDOWWIDTH, 
@@ -61,13 +61,6 @@ static const Vertex vertices_two[] = {
     { {  2.0f,  0.0f, 1.0f }, { 0.f, 0.f, 1.f } }   
 };
 
-float random[MAP_NUM_VERTICES_XAXIS];
-float noise[MAP_NUM_VERTICES_XAXIS];
-float random2D[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
-float noise2D[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
-Vertex meshForHeight[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
-unsigned int indicesForMesh[2 * ((3 * (MAP_NUM_VERTICES_XAXIS - 1) * (MAP_NUM_VERTICES_ZAXIS - 1)) + MAP_NUM_VERTICES_XAXIS + MAP_NUM_VERTICES_ZAXIS - 2)];
-
 //Counter-ClockWise winding
 unsigned int indices[] = {  //front
                             0, 1, 2,
@@ -89,10 +82,17 @@ unsigned int indices[] = {  //front
                             6, 2, 7
 };
 
+float random[MAP_NUM_VERTICES_XAXIS];
+float noise[MAP_NUM_VERTICES_XAXIS];
+float random2D[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
+float noise2D[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
+Vertex meshForHeight[MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS];
+unsigned int indicesForMesh[2 * ((3 * (MAP_NUM_VERTICES_XAXIS - 1) * (MAP_NUM_VERTICES_ZAXIS - 1)) + MAP_NUM_VERTICES_XAXIS + MAP_NUM_VERTICES_ZAXIS - 2)];
+
 void updateMesh(Vertex* mesh, float* noise);
 void one_dimensional_perlin_noise(float* random, float* noise, int octaves);
 void two_dimensional_perlin_noise(float* random, float* noiseArray, int octave);
-void init_mesh(Vertex* mesh, unsigned int* indices, float* noise);
+void init_mesh_lines(Vertex* mesh, unsigned int* indices, float* noise);
 void shader_error(GLuint shader);
 static void error_callback(int error, const char* description);
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -121,7 +121,7 @@ int main(void)
     
     two_dimensional_perlin_noise(&random2D, &noise2D, NUMOFOCTAVES);
 
-    init_mesh(&meshForHeight, &indicesForMesh, &noise2D);
+    init_mesh_lines(&meshForHeight, &indicesForMesh, &noise2D);
 
     int yeet = 0;
     // for(int j = 0; j < MAP_NUM_VERTICES_ZAXIS * MAP_NUM_VERTICES_XAXIS;  j++)
@@ -183,7 +183,7 @@ int main(void)
     GLuint vao = vao_create();
     vao_bind(vao);
 
-    vao_attribute(vao, vbo, vcol_location, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, col));
+    vao_attribute(vao, vbo, vcol_location, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, norm));
     vao_attribute(vao, vbo, vpos_location, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, pos));
 
     ////////////////////////////////////////////////////////////////////////////////////////
@@ -210,7 +210,7 @@ int main(void)
     GLuint vaoTwo = vao_create();
     vao_bind(vaoTwo);
 
-    vao_attribute(vaoTwo, vboTwo, vcol_location_two, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, col));
+    vao_attribute(vaoTwo, vboTwo, vcol_location_two, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, norm));
     vao_attribute(vaoTwo, vboTwo, vpos_location_two, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, pos));
 
     //3. Generate and bind the element buffer object and then populate the buffer
@@ -234,7 +234,7 @@ int main(void)
     GLuint vaoThree = vao_create();
     vao_bind(vaoThree);
 
-    vao_attribute(vaoThree, vboThree, vcol_location_three, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, col));
+    vao_attribute(vaoThree, vboThree, vcol_location_three, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, norm));
     vao_attribute(vaoThree, vboThree, vpos_location_three, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, pos));
 
     //3. Generate and bind the element buffer object and then populate the buffer
@@ -258,7 +258,7 @@ int main(void)
     GLuint vaoFour = vao_create();
     vao_bind(vaoFour);
 
-    vao_attribute(vaoFour, vboFour, vcol_location_Four, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, col));
+    vao_attribute(vaoFour, vboFour, vcol_location_Four, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, norm));
     vao_attribute(vaoFour, vboFour, vpos_location_Four, 3, GL_FLOAT, sizeof(Vertex), (void*) offsetof(Vertex, pos));
 
     //3. Generate and bind the element buffer object and then populate the buffer
@@ -294,7 +294,7 @@ int main(void)
         if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
         {
             two_dimensional_perlin_noise(&random2D, &noise2D, NUMOFOCTAVES);
-            updateMesh(&meshForHeight, &noise2D);
+            update_line_mesh(&meshForHeight, &noise2D);
             buff_bind(vboThree);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Vertex) * MAP_NUM_VERTICES_XAXIS * MAP_NUM_VERTICES_ZAXIS, &meshForHeight);
         }
@@ -457,7 +457,7 @@ void two_dimensional_perlin_noise(float* random, float* noiseArray, int octave)
 
 }
 
-void init_mesh(Vertex* mesh, unsigned int* indices, float* noise)
+void init_mesh_lines(Vertex* mesh, unsigned int* indices, float* noise)
 {   
     printf("\n\n%i\n\n", &mesh[0]);
     int index = 0;
@@ -518,7 +518,7 @@ void init_mesh(Vertex* mesh, unsigned int* indices, float* noise)
         {
             index = k * MAP_NUM_VERTICES_XAXIS + i;
 
-            mesh[index].pos[1] = 5.0f * noise[index];
+            mesh[index].pos[1] = 2.0f * noise[index];
             
         }
     }
@@ -527,7 +527,7 @@ void init_mesh(Vertex* mesh, unsigned int* indices, float* noise)
 
 }
 
-void updateMesh(Vertex* mesh, float* noise)
+void update_line_mesh(Vertex* mesh, float* noise)
 {
     int index = 0;
 
@@ -537,7 +537,7 @@ void updateMesh(Vertex* mesh, float* noise)
         {
             index = k * MAP_NUM_VERTICES_XAXIS + i;
 
-            mesh[index].pos[1] = 5.0f * noise[index];
+            mesh[index].pos[1] = 2.0f * noise[index];
         }
     }
 }
