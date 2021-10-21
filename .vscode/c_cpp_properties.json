@@ -4,7 +4,7 @@
       "name": "windows-gcc-x64",
       "includePath": [
         "${workspaceFolder}/**",
-        "${workspaceFolder}/lib/glfw/deps",
+        "${workspaceFolder}/lib/glfw/include",
         "${workspaceFolder}/lib/glad/include",
         "${workspaceFolder}/lib/cglm/include/CGLM"
       ],
