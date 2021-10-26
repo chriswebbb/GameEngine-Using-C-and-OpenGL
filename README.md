@@ -68,9 +68,10 @@ You will also need [mingw32-make](https://www.mingw-w64.org/downloads/#mingw-bui
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-My first test of this was with 3D based fragement shaders on a cube.
-
-The second test was generating a random height map using a psuedo perlin noise generater.
+My first test of this was with 3D based fragement shaders on a cube.<br/>
+ <img src="my-react-app-two/public/images/webpage.png" alt="Logo" width="auto" height="auto"><br/>
+The second test was generating a random height map using a psuedo perlin noise generater.<br/>
+ <img src="my-react-app-two/public/images/webpage.png" alt="Logo" width="auto" height="auto"><br/>
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
