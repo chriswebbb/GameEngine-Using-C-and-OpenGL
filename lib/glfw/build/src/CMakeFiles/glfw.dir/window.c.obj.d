@@ -1,7 +1,6 @@
 src/CMakeFiles/glfw.dir/window.c.obj: \
  C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\window.c \
  C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\internal.h \
- C:/Users/mater/OneDrive/Documents/3DGameInCUsingOpenGL/lib/glfw/build/src/glfw_config.h \
  C:/Users/mater/OneDrive/Documents/3DGameInCUsingOpenGL/lib/glfw/include/GLFW/glfw3.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/lib/gcc/i686-w64-mingw32/8.1.0/include/stddef.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/stddef.h \
@@ -14,6 +13,8 @@ src/CMakeFiles/glfw.dir/window.c.obj: \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/sdks/_mingw_ddk.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/lib/gcc/i686-w64-mingw32/8.1.0/include/stdint.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/stdint.h \
+ C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\platform.h \
+ C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\null_platform.h \
  C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\win32_platform.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/wctype.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/windows.h \
@@ -133,10 +134,10 @@ src/CMakeFiles/glfw.dir/window.c.obj: \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/_mingw_dxhelper.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/xinput.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/dbt.h \
+ C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\null_joystick.h \
  C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\win32_joystick.h \
- C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\wgl_context.h \
- C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\egl_context.h \
- C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\osmesa_context.h \
+ C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\win32_thread.h \
+ C:\Users\mater\OneDrive\Documents\3DGameInCUsingOpenGL\lib\glfw\src\win32_time.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/assert.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/lib/gcc/i686-w64-mingw32/8.1.0/include/float.h \
  C:/PROGRA~2/MINGW-~1/I686-8~2.0-P/mingw32/i686-w64-mingw32/include/float.h

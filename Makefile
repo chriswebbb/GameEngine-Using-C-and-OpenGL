@@ -2,7 +2,7 @@ UNAME_S = $(shell uname -s)
 
 SHELL = /bin/sh
 
-CC = gcc
+GCC = gcc
 CFLAGS = -std=c11 -g -Wall
 CFLAGS += -Ilib/cglm/include -Ilib/glad/include -Ilib/glfw/include -Ilib/stb -Ilib/noise -Ilib/glfw/deps -Isrc -Isrc/utils -Isrc/gfx 
 
@@ -29,11 +29,12 @@ libs:
 #	echo $(PATH)
 	echo $(HOME)
 	
-	cd lib/cglm && cmake -S . -B build -DCGLM_STATIC=ON && cd build && make
-	cd lib/glad && $(CC) -o src/glad.o -Iinclude -c src/glad.c
+	
+	cd lib/glad && $(GCC) -o src/glad.o -Iinclude -c src/glad.c
 	cd lib/glfw && cmake -S . -B build && cd build && mingw32-make
 	cd lib/noise && mingw32-make
-
+	cd lib/cglm && cmake -S . -B build -DCGLM_STATIC=ON && cd build && mingw32-make
+	
 dirs:
 	mkdir -p ./$(BIN)
 
@@ -42,10 +43,10 @@ run: all
 
 game: $(OBJ)
 #	echo "SECOND YEET"
-	$(CC) -o $(BIN)/game $^ $(LDFLAGS)
+	$(GCC) -o $(BIN)/game $^ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) -o $@ -c $< $(CFLAGS)
+	$(GCC) -o $@ -c $< $(CFLAGS)
 
 clean:
 	rm -rf $(BIN) $(OBJ)

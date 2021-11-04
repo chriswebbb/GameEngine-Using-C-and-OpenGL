@@ -59,7 +59,7 @@ static const char* vertex_shader_text =
 "out vec2 u_resolution;\n"
 "void main()\n"
 "{\n"
-"   gl_Position = MVP * vec4(vPos, 1.0);\n"
+"   gl_Position = MVP * vec4(vPos.xy, vPos.z + 10.0, 1.0);\n"
 "   position = vPos;\n"
 "   color = vCol;\n"
 "   u_resolution = vec2(1.0, 1.0);\n"

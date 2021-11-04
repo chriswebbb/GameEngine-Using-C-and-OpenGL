@@ -58,4 +58,5 @@ void main() {
                 vec3(0.666667,1,1),
                 clamp(length(r.x),0.0,1.0));
     gl_FragColor = vec4((f*f*f+.6*f*f+.5*f)*color,1.);
+    fragment = vec4(1.0, 1.0, 1.0, 1.0);
 }
