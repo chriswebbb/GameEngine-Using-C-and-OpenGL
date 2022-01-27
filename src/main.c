@@ -136,8 +136,6 @@ int main(void)
     //     printf("_%i_", indicesForMesh[w]);
     // }
 
-    
-
     // printf("\n\n");
     // for(int z = 0; z < MAP_NUM_VERTICES_ZAXIS; z++){
     //     for(int x = 0; x < MAP_NUM_VERTICES_ZAXIS; x++)
@@ -457,9 +455,35 @@ void two_dimensional_perlin_noise(float* random, float* noiseArray, int octave)
 
 }
 
+void init_lines(Vertex* mesh, unsigned int* indices, float* noise)
+{
+    int index = 0;
+    for(int j = 0; j < MAP_NUM_VERTICES_ZAXIS; j++)
+    {
+        for(int i = 0; i < MAP_NUM_VERTICES_XAXIS;  i++)
+        {
+            index = j * MAP_NUM_VERTICES_XAXIS + i;
+
+            mesh[index].pos[0] = SCALE * (float)i;//0.5f * (float)(i - (int)(MAP_NUM_VERTICES_XAXIS/2));
+            //printf("%.2f", mesh[index].pos[0]);
+            mesh[index].pos[1] = SCALE * (float)j;
+            mesh[index].pos[2] = 0;
+        }
+    }
+
+    //this is for lines.
+
+    for (int i = 0 ; i < (MAP_NUM_VERTICES_ZAXIS - 1) * (MAP_NUM_VERTICES_XAXIS - 1) ; i++)
+    {
+        indices[index] = i;
+        //printf("%i", i);
+    }
+
+}
+
 void init_mesh_lines(Vertex* mesh, unsigned int* indices, float* noise)
 {   
-    printf("\n\n%i\n\n", &mesh[0]);
+    //printf("\n\n%i\n\n", &mesh[0]);
     int index = 0;
     //Initialise the mesh
     for(int k = 0; k < MAP_NUM_VERTICES_ZAXIS; k++)
